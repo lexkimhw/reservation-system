@@ -71,20 +71,20 @@
             <strong>관리자 설정</strong>
         </div>
 
-        <div class="admin-box">
+<div class="admin-box">
     <strong>공지 및 예약 기간 설정</strong>
     <div style="margin: 10px 0; display: flex; gap: 5px;">
         <select id="templateSelect" style="flex: 1; padding: 5px;" onchange="loadTemplate(this.value)">
             <option value="">-- 저장된 템플릿 선택 --</option>
         </select>
-        <button onclick="saveAsTemplate()" style="font-size: 0.8rem;">현재 내용 저장</button>
+        <button onclick="saveAsTemplate()" style="font-size: 0.8rem; background: #e1f5fe; border: 1px solid #03a9f4;">저장</button>
+        <button onclick="deleteTemplate()" style="font-size: 0.8rem; background: #ffebee; border: 1px solid #ef5350; color: #d32f2f;">삭제</button>
     </div>
     <input type="text" id="edTitle" placeholder="제목">
     <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
     시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
     종료: <input type="datetime-local" id="edEnd">
-       </div>
-
+</div>
         <div class="admin-box">
             <strong>회차 및 정원 관리</strong>
             <div id="edSessions"></div>
@@ -115,11 +115,37 @@ let reserveLogs = {};
 let selectedIdx = null;
 
 // 템플릿 데이터 실시간 동기화
-db.ref('master/templates').on('value', (snap) => {
-    const templates = snap.val() || {};
+let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
+
+db.ref('master').on('value', (snap) => {
+    const data = snap.val();
+    if(data) {
+        configData = data;
+        
+        // 1. 사용자 화면 반영
+        document.getElementById('viewTitle').innerText = data.title || "";
+        document.getElementById('viewDesc').innerText = data.desc || "";
+        
+        // 2. 관리자 설정창 필드 반영
+        document.getElementById('edTitle').value = data.title || "";
+        document.getElementById('edDesc').value = data.desc || "";
+        document.getElementById('edStart').value = data.start || "";
+        document.getElementById('edEnd').value = data.end || "";
+        
+        // 3. 템플릿 목록 갱신 (추가된 부분)
+        renderTemplateList(data.templates || {});
+        
+        updatePeriodStatus();
+        renderUserSessions();
+        renderAdminSessions();
+    }
+});
+
+// 템플릿 셀렉트 박스를 그리는 전용 함수
+function renderTemplateList(templates) {
     const select = document.getElementById('templateSelect');
-    
-    // 기존 목록 초기화 (첫 번째 옵션 제외)
+    if(!select) return; // 관리자 모드가 아닐 때 에러 방지
+
     select.innerHTML = '<option value="">-- 저장된 템플릿 선택 --</option>';
     
     Object.keys(templates).forEach(key => {
@@ -128,11 +154,36 @@ db.ref('master/templates').on('value', (snap) => {
         opt.innerText = templates[key].title;
         select.appendChild(opt);
     });
-    
-    // 전역 변수에 저장 (불러오기용)
-    window.currentTemplates = templates;
-});
+ 
+// 템플릿 삭제 함수
+function deleteTemplate() {
+    const select = document.getElementById('templateSelect');
+    const selectedKey = select.value; // 선택된 옵션의 value (Firebase Key)
 
+    if (!selectedKey) {
+        return alert("삭제할 템플릿을 목록에서 먼저 선택해 주세요.");
+    }
+
+    const templateName = select.options[select.selectedIndex].text;
+
+    if (confirm(`'${templateName}' 템플릿을 정말 삭제하시겠습니까?`)) {
+        // Firebase에서 해당 항목 삭제
+        db.ref(`master/templates/${selectedKey}`).remove()
+            .then(() => {
+                alert("템플릿이 삭제되었습니다.");
+                // 입력 필드 초기화 (선택사항)
+                document.getElementById('edTitle').value = "";
+                document.getElementById('edDesc').value = "";
+            })
+            .catch((err) => {
+                alert("삭제 중 오류 발생: " + err);
+            });
+    }
+}
+   
+    // 전역 변수 동기화
+    window.currentTemplates = templates;
+}
 // 템플릿 불러오기 함수
 function loadTemplate(key) {
     if (!key || !window.currentTemplates[key]) return;
@@ -148,11 +199,39 @@ function saveAsTemplate() {
     
     if (!title || !desc) return alert("제목과 내용을 입력해주세요.");
     
+    // Firebase의 master/templates 경로에 추가
     if (confirm(`'${title}' 문구를 템플릿 목록에 저장할까요?`)) {
-        db.ref('master/templates').push({ title, desc })
-            .then(() => alert("템플릿이 저장되었습니다."));
+        db.ref('master/templates').push({ 
+            title: title, 
+            desc: desc 
+        }).then(() => {
+            alert("템플릿이 저장되었습니다.");
+        }).catch((err) => {
+            alert("저장 실패: " + err);
+        });
     }
 }
+
+function saveAdminSettings() {
+    // 1. 입력값 수집
+    const newSessions = (configData.sessions || []).map((_, i) => ({
+        name: document.getElementById(`sn${i}`).value,
+        cap: parseInt(document.getElementById(`sc${i}`).value)
+    }));
+
+    // 2. 저장 데이터 구성 (configData.templates를 포함시켜서 덮어쓰기 방지)
+    const updateData = {
+        title: document.getElementById('edTitle').value,
+        desc: document.getElementById('edDesc').value,
+        start: document.getElementById('edStart').value,
+        end: document.getElementById('edEnd').value,
+        sessions: newSessions,
+        templates: configData.templates || {} // 이 부분이 있어야 템플릿이 유지됩니다.
+    };
+
+    db.ref('master').set(updateData).then(() => alert("설정이 저장되었습니다."));
+}
+
 
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
