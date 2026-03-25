@@ -114,6 +114,46 @@ let configData = { title: "", desc: "", sessions: [], start: "", end: "" };
 let reserveLogs = {};
 let selectedIdx = null;
 
+// 템플릿 데이터 실시간 동기화
+db.ref('master/templates').on('value', (snap) => {
+    const templates = snap.val() || {};
+    const select = document.getElementById('templateSelect');
+    
+    // 기존 목록 초기화 (첫 번째 옵션 제외)
+    select.innerHTML = '<option value="">-- 저장된 템플릿 선택 --</option>';
+    
+    Object.keys(templates).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.innerText = templates[key].title;
+        select.appendChild(opt);
+    });
+    
+    // 전역 변수에 저장 (불러오기용)
+    window.currentTemplates = templates;
+});
+
+// 템플릿 불러오기 함수
+function loadTemplate(key) {
+    if (!key || !window.currentTemplates[key]) return;
+    const data = window.currentTemplates[key];
+    document.getElementById('edTitle').value = data.title;
+    document.getElementById('edDesc').value = data.desc;
+}
+
+// 현재 입력을 템플릿으로 저장
+function saveAsTemplate() {
+    const title = document.getElementById('edTitle').value.trim();
+    const desc = document.getElementById('edDesc').value.trim();
+    
+    if (!title || !desc) return alert("제목과 내용을 입력해주세요.");
+    
+    if (confirm(`'${title}' 문구를 템플릿 목록에 저장할까요?`)) {
+        db.ref('master/templates').push({ title, desc })
+            .then(() => alert("템플릿이 저장되었습니다."));
+    }
+}
+
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
