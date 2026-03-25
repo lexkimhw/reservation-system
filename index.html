@@ -72,12 +72,18 @@
         </div>
 
         <div class="admin-box">
-            <strong>공지 및 예약 기간 설정</strong>
-            <input type="text" id="edTitle" placeholder="제목">
-            <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
-            시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
-            종료: <input type="datetime-local" id="edEnd">
-        </div>
+    <strong>공지 및 예약 기간 설정</strong>
+    <div style="margin: 10px 0; display: flex; gap: 5px;">
+        <select id="templateSelect" style="flex: 1; padding: 5px;" onchange="loadTemplate(this.value)">
+            <option value="">-- 저장된 템플릿 선택 --</option>
+        </select>
+        <button onclick="saveAsTemplate()" style="font-size: 0.8rem;">현재 내용 저장</button>
+    </div>
+    <input type="text" id="edTitle" placeholder="제목">
+    <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
+    시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
+    종료: <input type="datetime-local" id="edEnd">
+       </div>
 
         <div class="admin-box">
             <strong>회차 및 정원 관리</strong>
