@@ -16,7 +16,6 @@
         .header-area h2 { font-size: 1.6rem; color: #111; margin-bottom: 12px; }
         .header-area p { font-size: 1rem; color: #555; background: #fdf2f2; padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c; text-align: left; white-space: pre-wrap; }
 
-        /* 기간 안내 스타일 */
         .period-info { background: #eee; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; text-align: center; font-weight: bold; color: #444; border: 1px solid #ddd; }
         .period-active { color: #0056b3; border: 1px solid #0056b3; background: #f0f7ff; }
 
@@ -29,12 +28,19 @@
         input, textarea { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         
-        #adminSection { display: none; margin-top: 10px; padding-top: 10px; }
+        #adminSection { display: none; margin-top: 10px; }
         .admin-nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
         .admin-row { display: flex; gap: 5px; margin-bottom: 8px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 15px; }
+        
+        /* 테이블 및 버튼 스타일 */
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 10px; }
         th, td { border: 1px solid #eee; padding: 8px; text-align: center; }
+        .list-ctrl { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 10px; }
+        .btn-excel { padding: 8px 12px; background: #217346; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+        .btn-clear { padding: 8px 12px; background: #fff; color: #e74c3c; border: 1px solid #e74c3c; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+        .btn-clear:hover { background: #fff5f5; }
+
         .admin-link { text-align: center; margin-top: 40px; }
         .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
     </style>
@@ -44,22 +50,18 @@
 <div class="container">
     <div id="userSection">
         <div class="header-area">
-            <h2 id="viewTitle">렉스김어학원 시험 안내</h2>
+            <h2 id="viewTitle">렉스김어학원 시험 예약</h2>
             <p id="viewDesc"></p>
         </div>
-
         <div id="periodDisplay" class="period-info">기간 확인 중...</div>
-
         <h3>1. 회차 선택</h3>
         <div id="sessionList" class="session-list"></div>
-        
         <div id="inputForm" style="display:none;">
             <h3>2. 정보 입력</h3>
             <input type="text" id="inName" placeholder="학생 이름 (한글)" oninput="this.value = this.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '')">
             <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
             <button class="btn-main" onclick="doReserve()">예약 신청 완료</button>
         </div>
-
         <div class="admin-link"><button onclick="checkAuth()">[ 관리자 설정 ]</button></div>
     </div>
 
@@ -72,7 +74,7 @@
         <div class="admin-box">
             <strong>공지 및 예약 기간 설정</strong>
             <input type="text" id="edTitle" placeholder="제목">
-            <textarea id="edDesc" rows="3" placeholder="안내 문구 입력 (입력 칸 위에 표시됨)"></textarea>
+            <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
             시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
             종료: <input type="datetime-local" id="edEnd">
         </div>
@@ -85,15 +87,19 @@
         
         <button class="btn-main" style="background:#333;" onclick="saveAdminSettings()">설정 저장 및 적용</button>
 
-        <div style="margin-top:30px;">
+        <div class="list-ctrl">
             <strong>실시간 예약 명단</strong>
-            <button onclick="downloadExcel()">엑셀 저장</button>
-            <table><thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead><tbody id="resTable"></tbody></table>
+            <div>
+                <button class="btn-excel" onclick="downloadExcel()">엑셀 저장</button>
+                <button class="btn-clear" onclick="clearAllLogs()">⚠️ 전체 삭제</button>
+            </div>
         </div>
+        <table><thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead><tbody id="resTable"></tbody></table>
     </div>
 </div>
 
 <script>
+// Firebase 설정 (본인의 DB 주소로 유지하세요)
 const firebaseConfig = { databaseURL: "https://reservation-lex-default-rtdb.asia-southeast1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -177,29 +183,44 @@ async function doReserve() {
 
 function checkAuth() { if(prompt("암호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
 function goHome() { document.getElementById('adminSection').style.display='none'; document.getElementById('userSection').style.display='block'; }
+
 function renderAdminSessions() {
     const div = document.getElementById('edSessions'); div.innerHTML = "";
-    configData.sessions.forEach((s, i) => {
+    (configData.sessions || []).forEach((s, i) => {
         div.innerHTML += `<div class="admin-row"><input type="text" id="sn${i}" value="${s.name}" style="flex:3"><input type="number" id="sc${i}" value="${s.cap}" style="flex:1"><button onclick="removeRow(${i})">X</button></div>`;
     });
 }
+
 function saveAdminSettings() {
-    const newSessions = configData.sessions.map((_, i) => ({ name: document.getElementById(`sn${i}`).value, cap: parseInt(document.getElementById(`sc${i}`).value) }));
+    const newSessions = (configData.sessions || []).map((_, i) => ({ name: document.getElementById(`sn${i}`).value, cap: parseInt(document.getElementById(`sc${i}`).value) }));
     db.ref('master').set({ title: document.getElementById('edTitle').value, desc: document.getElementById('edDesc').value, start: document.getElementById('edStart').value, end: document.getElementById('edEnd').value, sessions: newSessions }).then(() => alert("저장됨"));
 }
-function addSessionRow() { configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
+
+function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
 function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
+
 function renderLogTable() {
     const body = document.getElementById('resTable'); body.innerHTML = "";
     Object.keys(reserveLogs).reverse().forEach(k => { const r = reserveLogs[k]; body.innerHTML += `<tr><td>${r.session.substring(0,8)}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; });
 }
-function delLog(k) { if(confirm("삭제?")) db.ref(`logs/${k}`).remove(); }
+
+function delLog(k) { if(confirm("이 예약을 삭제하시겠습니까?")) db.ref(`logs/${k}`).remove(); }
+
+// [신규] 전체 로그 삭제 함수
+function clearAllLogs() {
+    if(confirm("⚠️ 경고: 모든 예약 명단이 영구적으로 삭제됩니다. 계속하시겠습니까?")) {
+        db.ref('logs').remove()
+            .then(() => alert("모든 명단이 삭제되었습니다."))
+            .catch((err) => alert("삭제 중 오류 발생: " + err));
+    }
+}
+
 function downloadExcel() {
-    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session}));
+    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "신청시간":r.date}));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "명단");
-    XLSX.writeFile(wb, "명단.xlsx");
+    XLSX.writeFile(wb, "렉스김어학원_예약명단.xlsx");
 }
 </script>
 </body>
