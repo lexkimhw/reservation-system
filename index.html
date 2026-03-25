@@ -11,38 +11,32 @@
         :root { --p-color: #0056b3; --bg: #f4f7f9; }
         body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 10px; line-height: 1.5; color: #333; }
         .container { max-width: 550px; margin: 20px auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        
         .header-area { text-align: center; margin-bottom: 25px; }
         .header-area h2 { font-size: 1.6rem; color: #111; margin-bottom: 12px; }
         .header-area p { font-size: 1rem; color: #555; background: #fdf2f2; padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c; text-align: left; white-space: pre-wrap; }
-
         .period-info { background: #eee; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; text-align: center; font-weight: bold; color: #444; border: 1px solid #ddd; }
         .period-active { color: #0056b3; border: 1px solid #0056b3; background: #f0f7ff; }
-
         .session-list { display: grid; gap: 10px; margin-bottom: 20px; }
         .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; background: #fff; }
         .session-item.disabled { opacity: 0.4; cursor: not-allowed; }
         .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; }
         .rem-tag { float: right; font-weight: bold; color: #e74c3c; }
-
-        input, textarea { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
+        input, textarea, select { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        
         #adminSection { display: none; margin-top: 10px; }
         .admin-nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
         .admin-row { display: flex; gap: 5px; margin-bottom: 8px; }
-        
-        /* 테이블 및 버튼 스타일 */
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 10px; }
         th, td { border: 1px solid #eee; padding: 8px; text-align: center; }
         .list-ctrl { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 10px; }
         .btn-excel { padding: 8px 12px; background: #217346; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
         .btn-clear { padding: 8px 12px; background: #fff; color: #e74c3c; border: 1px solid #e74c3c; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
-        .btn-clear:hover { background: #fff5f5; }
-
         .admin-link { text-align: center; margin-top: 40px; }
         .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
+        /* 템플릿 버튼 스타일 */
+        .temp-ctrl { display: flex; gap: 5px; margin-bottom: 5px; }
+        .btn-temp { flex: 1; padding: 8px; font-size: 0.8rem; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -73,6 +67,13 @@
 
         <div class="admin-box">
             <strong>공지 및 예약 기간 설정</strong>
+            <select id="templateSelect" onchange="loadTemplate(this.value)" style="margin-bottom: 5px;">
+                <option value="">-- 저장된 템플릿 선택 --</option>
+            </select>
+            <div class="temp-ctrl">
+                <button class="btn-temp" style="background:#e3f2fd;" onclick="saveAsTemplate()">현재 내용 저장</button>
+                <button class="btn-temp" style="background:#ffebee; color:#c62828;" onclick="deleteTemplate()">선택 삭제</button>
+            </div>
             <input type="text" id="edTitle" placeholder="제목">
             <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
             시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
@@ -99,25 +100,29 @@
 </div>
 
 <script>
-// Firebase 설정 (본인의 DB 주소로 유지하세요)
 const firebaseConfig = { databaseURL: "https://reservation-lex-default-rtdb.asia-southeast1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let configData = { title: "", desc: "", sessions: [], start: "", end: "" };
+let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
 let reserveLogs = {};
 let selectedIdx = null;
 
+// 데이터 실시간 감시
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
         configData = data;
-        document.getElementById('viewTitle').innerText = data.title;
-        document.getElementById('viewDesc').innerText = data.desc;
-        document.getElementById('edTitle').value = data.title;
-        document.getElementById('edDesc').value = data.desc;
+        document.getElementById('viewTitle').innerText = data.title || "";
+        document.getElementById('viewDesc').innerText = data.desc || "";
+        document.getElementById('edTitle').value = data.title || "";
+        document.getElementById('edDesc').value = data.desc || "";
         document.getElementById('edStart').value = data.start || "";
         document.getElementById('edEnd').value = data.end || "";
+        
+        // 템플릿 목록 렌더링 추가
+        renderTemplateList(data.templates || {});
+        
         updatePeriodStatus();
         renderUserSessions();
         renderAdminSessions();
@@ -125,6 +130,42 @@ db.ref('master').on('value', (snap) => {
 });
 
 db.ref('logs').on('value', (snap) => { reserveLogs = snap.val() || {}; renderLogTable(); });
+
+function renderTemplateList(templates) {
+    const select = document.getElementById('templateSelect');
+    if(!select) return;
+    select.innerHTML = '<option value="">-- 저장된 템플릿 선택 --</option>';
+    Object.keys(templates).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.innerText = templates[key].title;
+        select.appendChild(opt);
+    });
+}
+
+function loadTemplate(key) {
+    if(!key || !configData.templates[key]) return;
+    const item = configData.templates[key];
+    document.getElementById('edTitle').value = item.title;
+    document.getElementById('edDesc').value = item.desc;
+}
+
+function saveAsTemplate() {
+    const title = document.getElementById('edTitle').value.trim();
+    const desc = document.getElementById('edDesc').value.trim();
+    if(!title || !desc) return alert("제목과 내용을 입력하세요.");
+    if(confirm(`'${title}' 문구를 저장하시겠습니까?`)) {
+        db.ref('master/templates').push({ title, desc }).then(() => alert("템플릿 저장 완료"));
+    }
+}
+
+function deleteTemplate() {
+    const key = document.getElementById('templateSelect').value;
+    if(!key) return alert("삭제할 템플릿을 선택하세요.");
+    if(confirm("정말 삭제하시겠습니까?")) {
+        db.ref(`master/templates/${key}`).remove().then(() => alert("삭제 완료"));
+    }
+}
 
 function isPeriodActive() {
     if(!configData.start || !configData.end) return true;
@@ -149,7 +190,7 @@ function updatePeriodStatus() {
 function renderUserSessions() {
     const div = document.getElementById('sessionList'); div.innerHTML = "";
     const active = isPeriodActive();
-    configData.sessions.forEach((s, i) => {
+    (configData.sessions || []).forEach((s, i) => {
         const item = document.createElement('div');
         item.className = `session-item ${!active ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
         item.onclick = () => {
@@ -175,7 +216,6 @@ async function doReserve() {
     if(!isPeriodActive()) return alert("기간이 아닙니다.");
     if(!name || !phone || selectedIdx === null) return alert("정보를 모두 입력해주세요.");
     if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("연락처 형식을 확인해주세요.");
-
     await db.ref('logs').push({ date: new Date().toLocaleString(), session: configData.sessions[selectedIdx].name, student: name, phone: phone });
     await db.ref(`master/sessions/${selectedIdx}/cap`).set(configData.sessions[selectedIdx].cap - 1);
     alert("예약 완료!"); location.reload();
@@ -192,8 +232,19 @@ function renderAdminSessions() {
 }
 
 function saveAdminSettings() {
-    const newSessions = (configData.sessions || []).map((_, i) => ({ name: document.getElementById(`sn${i}`).value, cap: parseInt(document.getElementById(`sc${i}`).value) }));
-    db.ref('master').set({ title: document.getElementById('edTitle').value, desc: document.getElementById('edDesc').value, start: document.getElementById('edStart').value, end: document.getElementById('edEnd').value, sessions: newSessions }).then(() => alert("저장됨"));
+    const newSessions = (configData.sessions || []).map((_, i) => ({ 
+        name: document.getElementById(`sn${i}`).value, 
+        cap: parseInt(document.getElementById(`sc${i}`).value) 
+    }));
+    // templates를 포함하여 저장함으로써 데이터 유실 방지
+    db.ref('master').set({ 
+        title: document.getElementById('edTitle').value, 
+        desc: document.getElementById('edDesc').value, 
+        start: document.getElementById('edStart').value, 
+        end: document.getElementById('edEnd').value, 
+        sessions: newSessions,
+        templates: configData.templates || {}
+    }).then(() => alert("설정 저장 완료"));
 }
 
 function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
@@ -201,17 +252,16 @@ function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); 
 
 function renderLogTable() {
     const body = document.getElementById('resTable'); body.innerHTML = "";
-    Object.keys(reserveLogs).reverse().forEach(k => { const r = reserveLogs[k]; body.innerHTML += `<tr><td>${r.session.substring(0,8)}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; });
+    Object.keys(reserveLogs).reverse().forEach(k => { 
+        const r = reserveLogs[k]; 
+        body.innerHTML += `<tr><td>${r.session.substring(0,8)}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; 
+    });
 }
 
 function delLog(k) { if(confirm("이 예약을 삭제하시겠습니까?")) db.ref(`logs/${k}`).remove(); }
-
-// [신규] 전체 로그 삭제 함수
 function clearAllLogs() {
-    if(confirm("⚠️ 경고: 모든 예약 명단이 영구적으로 삭제됩니다. 계속하시겠습니까?")) {
-        db.ref('logs').remove()
-            .then(() => alert("모든 명단이 삭제되었습니다."))
-            .catch((err) => alert("삭제 중 오류 발생: " + err));
+    if(confirm("⚠️ 경고: 모든 예약 명단이 영구적으로 삭제됩니다.")) {
+        db.ref('logs').remove().then(() => alert("삭제되었습니다."));
     }
 }
 
