@@ -12,31 +12,37 @@
         body { font-family: 'Pretendard', -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; line-height: 1.5; color: #333; }
         .container { max-width: 550px; margin: 20px auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); position: relative; }
         
+        /* 상단 안내 */
         .header-area { text-align: center; margin-bottom: 25px; }
         .header-area h2 { font-size: 1.6rem; color: #111; margin-bottom: 12px; }
         .header-area p { font-size: 1rem; color: #555; background: #fdf2f2; padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c; text-align: left; white-space: pre-wrap; }
 
+        /* 기간 안내 */
         .period-info { background: #eee; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; text-align: center; font-weight: bold; color: #444; border: 1px solid #ddd; }
         .period-active { color: #0056b3; border: 1px solid #0056b3; background: #f0f7ff; }
 
+        /* 회차 리스트 */
         .session-list { display: grid; gap: 10px; margin-bottom: 20px; }
         .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; background: #fff; }
         .session-item.disabled { opacity: 0.4; cursor: not-allowed; }
         .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; box-shadow: 0 4px 10px rgba(0,86,179,0.1); }
         .rem-tag { float: right; font-weight: bold; color: #e74c3c; }
 
+        /* 정보 입력부 안내 문구 */
         .input-group { margin-top: 25px; padding: 20px; border: 1px dashed #ccc; border-radius: 12px; background: #fafafa; }
-        .info-notice { background: #fff9db; color: #856404; padding: 12px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 15px; border: 1px solid #ffeeba; font-weight: bold; text-align: center; }
+        .info-notice { background: #fff9db; color: #856404; padding: 12px; border-radius: 6px; font-size: 0.95rem; margin-bottom: 15px; border: 1px solid #ffeeba; font-weight: bold; text-align: center; }
 
         input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
         
+        /* 관리자 모드 */
         #adminSection { display: none; margin-top: 10px; }
         .admin-nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
         .admin-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 15px; }
         th, td { border: 1px solid #eee; padding: 8px; text-align: center; }
+        
         .admin-link { text-align: center; margin-top: 40px; }
         .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
     </style>
@@ -56,7 +62,7 @@
         <div id="sessionList" class="session-list"></div>
         
         <div id="inputForm" class="input-group" style="display:none;">
-            <div id="viewNotice" class="info-notice">안내 문구 로딩 중...</div>
+            <div id="viewNotice" class="info-notice"></div>
             <h3>2. 정보 입력</h3>
             <input type="text" id="inName" placeholder="학생 이름 (한글 입력)" oninput="this.value = this.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '')">
             <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
@@ -75,13 +81,13 @@
         <div class="admin-box">
             <strong>기본 및 기간 설정</strong>
             <input type="text" id="edTitle" placeholder="제목">
-            <textarea id="edDesc" rows="2" style="width:100%; margin-bottom:10px;"></textarea>
+            <textarea id="edDesc" rows="2" style="width:100%; margin-bottom:10px; font-family: inherit;"></textarea>
             시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
             종료: <input type="datetime-local" id="edEnd">
         </div>
 
         <div class="admin-box">
-            <strong>안내 문구 관리 (목록 중 하나 선택)</strong>
+            <strong>안내 문구 목록 (하나 선택)</strong>
             <div id="edNotices"></div>
             <button onclick="addNoticeRow()">+ 문구 추가</button>
         </div>
@@ -95,30 +101,33 @@
         <button class="btn-main" style="background:#333;" onclick="saveAdminSettings()">모든 설정 저장</button>
 
         <div style="margin-top:30px;">
-            <strong>예약 명단</strong>
-            <div style="margin:5px 0;"><button onclick="downloadExcel()">엑셀 저장</button> <button onclick="clearAllData()" style="color:red;">전체 삭제</button></div>
+            <strong>신청 명단 현황</strong>
+            <div style="margin:5px 0;"><button onclick="downloadExcel()">엑셀 저장</button> <button onclick="clearAllData()" style="color:red;">전체 데이터 삭제</button></div>
             <table><thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead><tbody id="resTable"></tbody></table>
         </div>
     </div>
 </div>
 
 <script>
+// Firebase 설정 (URL을 본인 주소로 변경하세요)
 const firebaseConfig = { databaseURL: "https://reservation-lex-default-rtdb.asia-southeast1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// 기본값 설정 (DB에 데이터가 없을 경우 사용)
+// 기본 안내 문구 세팅
 const defaultNotices = ["설명회 들은 학생만 신청 가능", "쌍둥이는 따로 입력"];
 let configData = { title: "렉스김어학원 시험 안내", desc: "", sessions: [], start: "", end: "", notices: defaultNotices, selectedNoticeIdx: 1 };
 let reserveLogs = {};
 let selectedIdx = null;
 
+// 실시간 데이터 로드
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
         configData = data;
-        // 데이터가 비어있을 경우 기본값 보완
+        // 데이터가 비어있을 경우 기본값 적용
         if(!configData.notices) configData.notices = defaultNotices;
+        if(configData.selectedNoticeIdx === undefined) configData.selectedNoticeIdx = 1;
     }
     refreshUI();
 });
@@ -133,10 +142,10 @@ function refreshUI() {
     document.getElementById('edStart').value = configData.start || "";
     document.getElementById('edEnd').value = configData.end || "";
     
-    // 안내 문구 표시
+    // 안내 문구 반영
     const notices = configData.notices || defaultNotices;
     const sIdx = configData.selectedNoticeIdx !== undefined ? configData.selectedNoticeIdx : 1;
-    document.getElementById('viewNotice').innerText = notices[sIdx] || notices[0];
+    document.getElementById('viewNotice').innerText = notices[sIdx] || "안내 사항을 확인해 주세요.";
     
     updatePeriodStatus();
     renderUserSessions();
@@ -159,7 +168,7 @@ function updatePeriodStatus() {
         selectedIdx = null;
     } else {
         const e = configData.end.replace('T', ' ');
-        el.innerText = `현재 예약 가능 시간입니다 (~ ${e})`;
+        el.innerText = `현재 예약 가능 시간입니다 (종료: ${e})`;
         el.className = "period-info period-active";
     }
 }
@@ -172,7 +181,7 @@ function renderUserSessions() {
         const item = document.createElement('div');
         item.className = `session-item ${!active ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
         item.onclick = () => {
-            if(!active) return alert("현재 입력 시간이 아닙니다.");
+            if(!active) return alert("현재 입력 시간이 아닙니다. 입력 가능 시간에만 회차 선택이 가능합니다.");
             selectedIdx = i;
             renderUserSessions();
             document.getElementById('inputForm').style.display = 'block';
@@ -200,11 +209,11 @@ async function doReserve() {
     
     await db.ref('logs').push({ date: new Date().toLocaleString(), session: configData.sessions[selectedIdx].name, student: name, phone: phone });
     await db.ref(`master/sessions/${selectedIdx}/cap`).set(configData.sessions[selectedIdx].cap - 1);
-    alert("예약이 완료되었습니다!");
+    alert("예약이 정상적으로 신청되었습니다.");
     location.reload();
 }
 
-// 관리자: 안내 문구 리스트 출력
+// 관리자: 안내 문구 목록 렌더링
 function renderAdminNotices() {
     const div = document.getElementById('edNotices');
     div.innerHTML = "";
@@ -235,12 +244,12 @@ function saveAdminSettings() {
         sessions: newSessions,
         notices: newNotices,
         selectedNoticeIdx: parseInt(selIdx)
-    }).then(() => alert("설정이 저장되었습니다."));
+    }).then(() => alert("모든 설정이 저장되었습니다."));
 }
 
 function checkAuth() { if(prompt("관리자 암호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
 function goHome() { document.getElementById('adminSection').style.display='none'; document.getElementById('userSection').style.display='block'; }
-function addNoticeRow() { if(!configData.notices) configData.notices = []; configData.notices.push("신규 문구"); renderAdminNotices(); }
+function addNoticeRow() { if(!configData.notices) configData.notices = []; configData.notices.push("신규 안내 문구"); renderAdminNotices(); }
 function removeNoticeRow(i) { configData.notices.splice(i, 1); renderAdminNotices(); }
 function renderAdminSessions() {
     const div = document.getElementById('edSessions'); div.innerHTML = "";
@@ -248,20 +257,20 @@ function renderAdminSessions() {
         div.innerHTML += `<div class="admin-row"><input type="text" id="sn${i}" value="${s.name}" style="flex:3"><input type="number" id="sc${i}" value="${s.cap}" style="flex:1"><button onclick="removeSessionRow(${i})" style="border:none; background:none; color:red; cursor:pointer;">X</button></div>`;
     });
 }
-function addSessionRow() { configData.sessions.push({name:"회차 정보", cap:20}); renderAdminSessions(); }
+function addSessionRow() { configData.sessions.push({name:"회차 정보 입력", cap:20}); renderAdminSessions(); }
 function removeSessionRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
 function renderLogTable() {
     const body = document.getElementById('resTable'); body.innerHTML = "";
     Object.keys(reserveLogs).reverse().forEach(k => { const r = reserveLogs[k]; body.innerHTML += `<tr><td>${r.session.substring(0,8)}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="deleteLog('${k}')" style="border:none; background:none; color:red; cursor:pointer;">삭제</button></td></tr>`; });
 }
-function deleteLog(k) { if(confirm("예약을 삭제하시겠습니까?")) db.ref(`logs/${k}`).remove(); }
-function clearAllData() { if(confirm("전체 데이터를 삭제하시겠습니까?")) db.ref('logs').remove(); }
+function deleteLog(k) { if(confirm("삭제하시겠습니까?")) db.ref(`logs/${k}`).remove(); }
+function clearAllData() { if(confirm("모든 데이터를 영구 삭제하시겠습니까?")) db.ref('logs').remove(); }
 function downloadExcel() {
-    const data = Object.values(reserveLogs).map(r => ({"신청시간":r.date, "회차":r.session, "학생이름":r.student, "학부모번호":r.phone}));
+    const data = Object.values(reserveLogs).map(r => ({"신청시간":r.date, "회차":r.session, "학생이름":r.student, "부모님번호":r.phone}));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "예약명단");
-    XLSX.writeFile(wb, "렉스김어학원_예약명단.xlsx");
+    XLSX.writeFile(wb, "렉스김어학원_명단.xlsx");
 }
 </script>
 </body>
