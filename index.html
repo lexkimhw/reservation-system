@@ -10,73 +10,73 @@
     <style>
         :root { --p-color: #0056b3; --bg: #f4f7f9; }
         body { font-family: 'Pretendard', -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; line-height: 1.5; color: #333; }
-        .container { max-width: 550px; margin: 20px auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .container { max-width: 550px; margin: 20px auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); position: relative; }
         
-        /* 상단 안내문 */
         .header-area { text-align: center; margin-bottom: 25px; }
         .header-area h2 { font-size: 1.6rem; color: #111; margin-bottom: 12px; word-break: keep-all; }
         .header-area p { font-size: 1rem; color: #555; background: #fdf2f2; padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c; text-align: left; white-space: pre-wrap; }
 
-        /* 회차 선택 및 입력 */
-        h3 { font-size: 1.1rem; margin-top: 25px; margin-bottom: 10px; color: #222; }
         .session-list { display: grid; gap: 10px; margin-bottom: 20px; }
         .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; position: relative; transition: all 0.2s; background: #fff; }
-        .session-item:hover { border-color: var(--p-color); }
         .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; box-shadow: 0 4px 12px rgba(0,86,179,0.1); }
         .rem-tag { float: right; font-weight: bold; color: #e74c3c; font-size: 0.9rem; }
 
         input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         
-        /* 관리자 전환 버튼 */
-        .admin-link { text-align: center; margin-top: 40px; }
-        .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
-
-        /* 관리자 섹션 */
-        #adminSection { display: none; border-top: 2px dashed #eee; margin-top: 30px; padding-top: 20px; }
+        #adminSection { display: none; margin-top: 10px; padding-top: 10px; }
+        .admin-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .back-home { cursor: pointer; font-size: 1.5rem; background: none; border: none; color: #555; display: flex; align-items: center; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
         .admin-row { display: flex; gap: 5px; margin-bottom: 8px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 15px; }
         th, td { border: 1px solid #eee; padding: 8px; text-align: center; }
-        .btn-excel { background: #217346; color: white; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px; }
-        .btn-clear { background: #333; color: white; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; }
+        
+        .admin-link { text-align: center; margin-top: 40px; }
+        .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header-area">
-        <h2 id="viewTitle">렉스김어학원 시험 안내</h2>
-        <p id="viewDesc">대상 초등 2학년부터 6학년까지 신청 가능. 신청 완료후 확인 문자 보내 드립니다.</p>
-    </div>
-
     <div id="userSection">
-        <h3>1. 희차 선택</h3>
+        <div class="header-area">
+            <h2 id="viewTitle">렉스김어학원 시험 안내</h2>
+            <p id="viewDesc">대상 초등 2학년부터 6학년까지 신청 가능. 신청 완료후 확인 문자 보내 드립니다.</p>
+        </div>
+
+        <h3>1. 회차 선택</h3>
         <div id="sessionList" class="session-list"></div>
         
         <div id="inputForm" style="display:none;">
             <h3>2. 정보 입력</h3>
-            <input type="text" id="inName" placeholder="학생 성함">
+            <input type="text" id="inName" placeholder="학생 이름 (한글 입력)" 
+                   oninput="this.value = this.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '')">
             <input type="text" id="inPhone" placeholder="학부모님 연락처 (예: 010-1234-5678)" maxlength="13">
             <button class="btn-main" onclick="doReserve()">예약 신청 완료</button>
         </div>
-    </div>
 
-    <div class="admin-link">
-        <button onclick="checkAuth()">[ 관리자 설정 ]</button>
+        <div class="admin-link">
+            <button onclick="checkAuth()">[ 관리자 설정 ]</button>
+        </div>
     </div>
 
     <div id="adminSection">
+        <div class="admin-nav">
+            <button class="back-home" onclick="goHome()">🏠 <span style="font-size: 1rem; margin-left:5px;">메인 화면으로</span></button>
+            <strong style="font-size: 1.2rem;">시스템 관리</strong>
+        </div>
+
         <div class="admin-box">
             <strong>공지 문구 수정</strong>
             <input type="text" id="edTitle">
-            <textarea id="edDesc" rows="3" style="width:100%; border:1px solid #ddd; border-radius:5px; padding:10px;"></textarea>
+            <textarea id="edDesc" rows="3" style="width:100%; border:1px solid #ddd; border-radius:5px; padding:10px; font-family: inherit;"></textarea>
         </div>
 
         <div class="admin-box">
             <strong>회차 및 정원 관리</strong>
             <div id="edSessions"></div>
-            <button onclick="addSessionRow()" style="margin-top:10px;">+ 회차 추가</button>
+            <button onclick="addSessionRow()" style="margin-top:10px; cursor:pointer;">+ 회차 추가</button>
         </div>
         
         <button class="btn-main" style="background:#333;" onclick="saveAdminSettings()">설정 저장 및 적용</button>
@@ -84,8 +84,8 @@
         <div style="margin-top:30px;">
             <strong>실시간 예약 명단</strong>
             <div style="margin: 10px 0;">
-                <button class="btn-excel" onclick="downloadExcel()">📊 엑셀 저장</button>
-                <button class="btn-clear" onclick="clearAllData()">🗑️ 전체 삭제</button>
+                <button onclick="downloadExcel()" style="background:#217346; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;">📊 엑셀 저장</button>
+                <button onclick="clearAllData()" style="background:#c0392b; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;">🗑️ 전체 삭제</button>
             </div>
             <table>
                 <thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead>
@@ -96,7 +96,7 @@
 </div>
 
 <script>
-// Firebase 설정 (URL을 본인의 주소로 변경하세요)
+// Firebase 설정 (본인의 URL로 변경 필수)
 const firebaseConfig = { databaseURL: "https://reservation-lex-default-rtdb.asia-southeast1.firebasedatabase.app/" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -105,7 +105,6 @@ let configData = { title: "", desc: "", sessions: [] };
 let reserveLogs = {};
 let selectedIdx = null;
 
-// 데이터 실시간 로드
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
@@ -155,14 +154,19 @@ async function doReserve() {
     location.reload();
 }
 
-// 관리자 관련 함수들
 function checkAuth() {
-    if(prompt("관리자 암호를 입력하세요.") === "8425") {
+    // 암호: 5556575
+    if(prompt("관리자 암호를 입력하세요.") === "5556575") {
+        document.getElementById('userSection').style.display = 'none';
         document.getElementById('adminSection').style.display = 'block';
-        window.scrollTo(0, document.body.scrollHeight);
     } else {
         alert("암호가 틀렸습니다.");
     }
+}
+
+function goHome() {
+    document.getElementById('adminSection').style.display = 'none';
+    document.getElementById('userSection').style.display = 'block';
 }
 
 function renderAdminSessions() {
@@ -172,7 +176,7 @@ function renderAdminSessions() {
         div.innerHTML += `<div class="admin-row">
             <input type="text" id="sn${i}" value="${s.name}" style="flex:3">
             <input type="number" id="sc${i}" value="${s.cap}" style="flex:1">
-            <button onclick="removeSessionRow(${i})" style="border:none; color:red; cursor:pointer;">X</button>
+            <button onclick="removeSessionRow(${i})" style="border:none; color:red; cursor:pointer; background:none; font-weight:bold;">X</button>
         </div>`;
     });
 }
@@ -186,7 +190,7 @@ function renderLogTable() {
             <td>${r.session.split(' ')[0]}</td>
             <td>${r.student}</td>
             <td>${r.phone}</td>
-            <td><button onclick="deleteLog('${key}')" style="border:none; color:red; cursor:pointer;">삭제</button></td>
+            <td><button onclick="deleteLog('${key}')" style="border:none; color:red; cursor:pointer; background:none;">삭제</button></td>
         </tr>`;
     });
 }
@@ -207,7 +211,7 @@ function saveAdminSettings() {
 }
 
 function deleteLog(key) { if(confirm("해당 예약을 삭제할까요?")) db.ref(`logs/${key}`).remove(); }
-function clearAllData() { if(confirm("모든 예약 데이터를 삭제하시겠습니까?")) db.ref('logs').remove(); }
+function clearAllData() { if(confirm("모든 데이터를 삭제하시겠습니까?")) db.ref('logs').remove(); }
 function downloadExcel() {
     const data = Object.values(reserveLogs).map(r => ({"일시":r.date, "회차":r.session, "이름":r.student, "번호":r.phone}));
     const ws = XLSX.utils.json_to_sheet(data);
