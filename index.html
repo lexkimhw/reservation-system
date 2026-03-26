@@ -100,8 +100,15 @@
 </div>
 
 <script>
-const firebaseConfig = { databaseURL: "https://reservation-lex-default-rtdb.asia-southeast1.firebasedatabase.app/" };
-firebase.initializeApp(firebaseConfig);
+// Firebase 주소 적용
+const firebaseConfig = { 
+    databaseURL: "https://lexkimhw-63c3b-default-rtdb.asia-southeast1.firebasedatabase.app/" 
+};
+
+// 초기화 확인 로직 포함
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.database();
 
 let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
