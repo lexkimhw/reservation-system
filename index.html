@@ -55,7 +55,7 @@
         <div id="inputForm" style="display:none;">
             <h3>2. 정보 입력</h3>
             <!-- 한글/영문/공백 허용 및 한글 자판 우선순위 설정 -->
-            <input type="text" id="inName" placeholder="학생 이름 (한글 또는 영문)" lang="ko" oninput="validateName(this)">
+            <input type="text" id="inName" placeholder="학생 이름 (한글)" lang="ko" oninput="validateName(this)">
             <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
             <button class="btn-main" id="submitBtn" onclick="doReserve()">예약 신청 완료</button>
         </div>
