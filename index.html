@@ -17,12 +17,13 @@
         .period-info { background: #eee; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 15px; text-align: center; font-weight: bold; color: #444; border: 1px solid #ddd; }
         .period-active { color: #0056b3; border: 1px solid #0056b3; background: #f0f7ff; }
         .session-list { display: grid; gap: 10px; margin-bottom: 20px; }
-        .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; background: #fff; }
-        .session-item.disabled { opacity: 0.4; cursor: not-allowed; }
+        .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; background: #fff; position: relative; }
+        .session-item.disabled { opacity: 0.5; cursor: not-allowed; background: #f9f9f9; }
         .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; }
         .rem-tag { float: right; font-weight: bold; color: #e74c3c; }
         input, textarea, select { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .btn-main:disabled { background: #ccc; cursor: not-allowed; }
         #adminSection { display: none; margin-top: 10px; }
         .admin-nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
@@ -34,7 +35,6 @@
         .btn-clear { padding: 8px 12px; background: #fff; color: #e74c3c; border: 1px solid #e74c3c; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
         .admin-link { text-align: center; margin-top: 40px; }
         .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
-        /* 템플릿 버튼 스타일 */
         .temp-ctrl { display: flex; gap: 5px; margin-bottom: 5px; }
         .btn-temp { flex: 1; padding: 8px; font-size: 0.8rem; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; }
     </style>
@@ -42,23 +42,28 @@
 <body>
 
 <div class="container">
+    <!-- 사용자 섹션 -->
     <div id="userSection">
         <div class="header-area">
             <h2 id="viewTitle">렉스김어학원 시험 예약</h2>
             <p id="viewDesc"></p>
         </div>
         <div id="periodDisplay" class="period-info">기간 확인 중...</div>
+        
         <h3>1. 회차 선택</h3>
         <div id="sessionList" class="session-list"></div>
+        
         <div id="inputForm" style="display:none;">
             <h3>2. 정보 입력</h3>
             <input type="text" id="inName" placeholder="학생 이름 (한글)" oninput="this.value = this.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '')">
             <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
-            <button class="btn-main" onclick="doReserve()">예약 신청 완료</button>
+            <button class="btn-main" id="submitBtn" onclick="doReserve()">예약 신청 완료</button>
         </div>
+        
         <div class="admin-link"><button onclick="checkAuth()">[ 관리자 설정 ]</button></div>
     </div>
 
+    <!-- 관리자 섹션 -->
     <div id="adminSection">
         <div class="admin-nav">
             <button onclick="goHome()">🏠 메인으로</button>
@@ -95,48 +100,244 @@
                 <button class="btn-clear" onclick="clearAllLogs()">⚠️ 전체 삭제</button>
             </div>
         </div>
-        <table><thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead><tbody id="resTable"></tbody></table>
+        <table>
+            <thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead>
+            <tbody id="resTable"></tbody>
+        </table>
     </div>
 </div>
 
 <script>
-// Firebase 주소 적용
+// [설정] Firebase 연결
 const firebaseConfig = { 
     databaseURL: "https://lexkimhw-63c3b-default-rtdb.asia-southeast1.firebasedatabase.app/" 
 };
-
-// 초기화 확인 로직 포함
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
 let reserveLogs = {};
 let selectedIdx = null;
 
-// 데이터 실시간 감시
+// [데이터 감시] 실시간 업데이트
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
         configData = data;
-        document.getElementById('viewTitle').innerText = data.title || "";
+        document.getElementById('viewTitle').innerText = data.title || "렉스김어학원 시험 예약";
         document.getElementById('viewDesc').innerText = data.desc || "";
         document.getElementById('edTitle').value = data.title || "";
         document.getElementById('edDesc').value = data.desc || "";
         document.getElementById('edStart').value = data.start || "";
         document.getElementById('edEnd').value = data.end || "";
         
-        // 템플릿 목록 렌더링 추가
         renderTemplateList(data.templates || {});
-        
         updatePeriodStatus();
         renderUserSessions();
         renderAdminSessions();
     }
 });
 
-db.ref('logs').on('value', (snap) => { reserveLogs = snap.val() || {}; renderLogTable(); });
+db.ref('logs').on('value', (snap) => { 
+    reserveLogs = snap.val() || {}; 
+    renderLogTable(); 
+});
+
+// [기능] 기간 활성화 체크
+function isPeriodActive() {
+    if(!configData.start || !configData.end) return true;
+    const now = new Date();
+    return now >= new Date(configData.start) && now <= new Date(configData.end);
+}
+
+function updatePeriodStatus() {
+    const el = document.getElementById('periodDisplay');
+    if(!isPeriodActive()) {
+        el.innerText = "현재 예약 기간이 아닙니다.";
+        el.className = "period-info";
+        document.getElementById('inputForm').style.display = 'none';
+        selectedIdx = null;
+    } else {
+        const eStr = (configData.end || "").replace('T', ' ');
+        el.innerText = `현재 예약 가능 기간 (~ ${eStr})`;
+        el.className = "period-info period-active";
+    }
+}
+
+// [기능] 사용자 세션 리스트 렌더링 (마감 처리 포함)
+function renderUserSessions() {
+    const div = document.getElementById('sessionList'); 
+    div.innerHTML = "";
+    const active = isPeriodActive();
+    
+    (configData.sessions || []).forEach((s, i) => {
+        const isSoldOut = s.cap <= 0;
+        const item = document.createElement('div');
+        item.className = `session-item ${(!active || isSoldOut) ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
+        
+        item.onclick = () => {
+            if(!active) return alert("현재 입력 시간이 아닙니다.");
+            if(isSoldOut) return alert("해당 회차는 마감되었습니다.");
+            selectedIdx = i; 
+            renderUserSessions();
+            document.getElementById('inputForm').style.display = 'block';
+        };
+        
+        const statusText = isSoldOut ? "마감" : `잔여 ${s.cap}석`;
+        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${statusText}</span><strong>${s.name}</strong>`;
+        div.appendChild(item);
+    });
+}
+
+// [기능] 예약 로직 (중복체크 + 트랜잭션 + 폼초기화)
+async function doReserve() {
+    const name = document.getElementById('inName').value.trim();
+    const phone = document.getElementById('inPhone').value.trim();
+    const btn = document.getElementById('submitBtn');
+    
+    if(!isPeriodActive()) return alert("기간이 아닙니다.");
+    if(!name || !phone || selectedIdx === null) return alert("모든 정보를 입력해주세요.");
+    if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("연락처 형식을 확인해주세요. (010-0000-0000)");
+
+    btn.disabled = true;
+
+    // 1. 중복 예약 체크
+    const logsSnap = await db.ref('logs').once('value');
+    const logs = logsSnap.val() || {};
+    const isDuplicate = Object.values(logs).some(log => log.student === name && log.phone === phone);
+    
+    if (isDuplicate) {
+        btn.disabled = false;
+        return alert("이미 동일한 정보로 신청된 내역이 있습니다.");
+    }
+
+    // 2. 트랜잭션을 활용한 잔여석 차감
+    const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
+    sessionRef.transaction((currentData) => {
+        if (currentData) {
+            if (currentData.cap <= 0) return; // 잔여석 없으면 중단
+            currentData.cap -= 1;
+        }
+        return currentData;
+    }, (error, committed, snapshot) => {
+        if (error) {
+            alert("처리 중 오류가 발생했습니다.");
+            btn.disabled = false;
+        } else if (!committed) {
+            alert("죄송합니다. 방금 마감된 회차입니다.");
+            btn.disabled = false;
+        } else {
+            // 3. 예약 로그 저장 및 폼 초기화
+            db.ref('logs').push({
+                date: new Date().toLocaleString('ko-KR'),
+                session: snapshot.val().name,
+                student: name,
+                phone: phone
+            }).then(() => {
+                alert(`${name}님, 예약이 정상적으로 완료되었습니다.`);
+                resetForm();
+            });
+        }
+    });
+}
+
+function resetForm() {
+    document.getElementById('inName').value = "";
+    document.getElementById('inPhone').value = "";
+    document.getElementById('submitBtn').disabled = false;
+    selectedIdx = null;
+    document.getElementById('inputForm').style.display = 'none';
+    renderUserSessions();
+}
+
+// [관리자] 설정 저장
+function saveAdminSettings() {
+    const sessionRows = [];
+    const count = (configData.sessions || []).length;
+    for(let i=0; i<count; i++) {
+        sessionRows.push({
+            name: document.getElementById(`sn${i}`).value,
+            cap: parseInt(document.getElementById(`sc${i}`).value)
+        });
+    }
+    
+    db.ref('master').update({
+        title: document.getElementById('edTitle').value,
+        desc: document.getElementById('edDesc').value,
+        start: document.getElementById('edStart').value,
+        end: document.getElementById('edEnd').value,
+        sessions: sessionRows
+    }).then(() => alert("설정이 저장되었습니다."));
+}
+
+// [기능] 기타 보조 함수
+function autoHyphen(obj) {
+    let str = obj.value.replace(/[^0-9]/g, '');
+    if (str.length < 4) obj.value = str;
+    else if (str.length < 11) obj.value = str.substr(0, 3) + '-' + str.substr(3, 3) + '-' + str.substr(6);
+    else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
+}
+
+function checkAuth() { 
+    if(prompt("관리자 암호를 입력하세요.") === "5556575") { 
+        document.getElementById('userSection').style.display='none'; 
+        document.getElementById('adminSection').style.display='block'; 
+    } 
+}
+
+function goHome() { 
+    document.getElementById('adminSection').style.display='none'; 
+    document.getElementById('userSection').style.display='block'; 
+}
+
+function renderAdminSessions() {
+    const div = document.getElementById('edSessions'); 
+    div.innerHTML = "";
+    (configData.sessions || []).forEach((s, i) => {
+        div.innerHTML += `
+            <div class="admin-row">
+                <input type="text" id="sn${i}" value="${s.name}" style="flex:3">
+                <input type="number" id="sc${i}" value="${s.cap}" style="flex:1">
+                <button onclick="removeRow(${i})">X</button>
+            </div>`;
+    });
+}
+
+function addSessionRow() { 
+    if(!configData.sessions) configData.sessions = []; 
+    configData.sessions.push({name:"", cap:20}); 
+    renderAdminSessions(); 
+}
+
+function removeRow(i) { 
+    configData.sessions.splice(i,1); 
+    renderAdminSessions(); 
+}
+
+function renderLogTable() {
+    const body = document.getElementById('resTable'); 
+    body.innerHTML = "";
+    Object.keys(reserveLogs).reverse().forEach(k => { 
+        const r = reserveLogs[k]; 
+        body.innerHTML += `<tr><td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; 
+    });
+}
+
+function delLog(k) { if(confirm("삭제하시겠습니까?")) db.ref(`logs/${k}`).remove(); }
+
+function clearAllLogs() {
+    if(confirm("모든 예약 명단을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+        db.ref('logs').remove();
+    }
+}
+
+function downloadExcel() {
+    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "신청시간":r.date}));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "명단");
+    XLSX.writeFile(wb, "렉스김어학원_예약명단.xlsx");
+}
 
 function renderTemplateList(templates) {
     const select = document.getElementById('templateSelect');
@@ -160,124 +361,14 @@ function loadTemplate(key) {
 function saveAsTemplate() {
     const title = document.getElementById('edTitle').value.trim();
     const desc = document.getElementById('edDesc').value.trim();
-    if(!title || !desc) return alert("제목과 내용을 입력하세요.");
-    if(confirm(`'${title}' 문구를 저장하시겠습니까?`)) {
-        db.ref('master/templates').push({ title, desc }).then(() => alert("템플릿 저장 완료"));
-    }
+    if(!title || !desc) return alert("내용을 입력하세요.");
+    db.ref('master/templates').push({ title, desc }).then(() => alert("템플릿 저장 완료"));
 }
 
 function deleteTemplate() {
     const key = document.getElementById('templateSelect').value;
-    if(!key) return alert("삭제할 템플릿을 선택하세요.");
-    if(confirm("정말 삭제하시겠습니까?")) {
-        db.ref(`master/templates/${key}`).remove().then(() => alert("삭제 완료"));
-    }
-}
-
-function isPeriodActive() {
-    if(!configData.start || !configData.end) return true;
-    const now = new Date();
-    return now >= new Date(configData.start) && now <= new Date(configData.end);
-}
-
-function updatePeriodStatus() {
-    const el = document.getElementById('periodDisplay');
-    if(!isPeriodActive()) {
-        el.innerText = "현재 입력 시간이 아닙니다. 입력 가능 시간에만 회차 선택이 가능합니다.";
-        el.className = "period-info";
-        document.getElementById('inputForm').style.display = 'none';
-        selectedIdx = null;
-    } else {
-        const eStr = (configData.end || "").replace('T', ' ');
-        el.innerText = `현재 예약 가능 기간입니다 (~ ${eStr})`;
-        el.className = "period-info period-active";
-    }
-}
-
-function renderUserSessions() {
-    const div = document.getElementById('sessionList'); div.innerHTML = "";
-    const active = isPeriodActive();
-    (configData.sessions || []).forEach((s, i) => {
-        const item = document.createElement('div');
-        item.className = `session-item ${!active ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
-        item.onclick = () => {
-            if(!active) return alert("현재 입력 시간이 아닙니다.");
-            selectedIdx = i; renderUserSessions();
-            document.getElementById('inputForm').style.display = 'block';
-        };
-        item.innerHTML = `<span class="rem-tag">잔여 ${s.cap}석</span><strong>${s.name}</strong>`;
-        div.appendChild(item);
-    });
-}
-
-function autoHyphen(obj) {
-    let str = obj.value.replace(/[^0-9]/g, '');
-    if (str.length < 4) obj.value = str;
-    else if (str.length < 11) obj.value = str.substr(0, 3) + '-' + str.substr(3, 3) + '-' + str.substr(6);
-    else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
-}
-
-async function doReserve() {
-    const name = document.getElementById('inName').value.trim();
-    const phone = document.getElementById('inPhone').value.trim();
-    if(!isPeriodActive()) return alert("기간이 아닙니다.");
-    if(!name || !phone || selectedIdx === null) return alert("정보를 모두 입력해주세요.");
-    if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("연락처 형식을 확인해주세요.");
-    await db.ref('logs').push({ date: new Date().toLocaleString(), session: configData.sessions[selectedIdx].name, student: name, phone: phone });
-    await db.ref(`master/sessions/${selectedIdx}/cap`).set(configData.sessions[selectedIdx].cap - 1);
-    alert("예약 완료!"); location.reload();
-}
-
-function checkAuth() { if(prompt("암호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
-function goHome() { document.getElementById('adminSection').style.display='none'; document.getElementById('userSection').style.display='block'; }
-
-function renderAdminSessions() {
-    const div = document.getElementById('edSessions'); div.innerHTML = "";
-    (configData.sessions || []).forEach((s, i) => {
-        div.innerHTML += `<div class="admin-row"><input type="text" id="sn${i}" value="${s.name}" style="flex:3"><input type="number" id="sc${i}" value="${s.cap}" style="flex:1"><button onclick="removeRow(${i})">X</button></div>`;
-    });
-}
-
-function saveAdminSettings() {
-    const newSessions = (configData.sessions || []).map((_, i) => ({ 
-        name: document.getElementById(`sn${i}`).value, 
-        cap: parseInt(document.getElementById(`sc${i}`).value) 
-    }));
-    // templates를 포함하여 저장함으로써 데이터 유실 방지
-    db.ref('master').set({ 
-        title: document.getElementById('edTitle').value, 
-        desc: document.getElementById('edDesc').value, 
-        start: document.getElementById('edStart').value, 
-        end: document.getElementById('edEnd').value, 
-        sessions: newSessions,
-        templates: configData.templates || {}
-    }).then(() => alert("설정 저장 완료"));
-}
-
-function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
-function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
-
-function renderLogTable() {
-    const body = document.getElementById('resTable'); body.innerHTML = "";
-    Object.keys(reserveLogs).reverse().forEach(k => { 
-        const r = reserveLogs[k]; 
-        body.innerHTML += `<tr><td>${r.session.substring(0,8)}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; 
-    });
-}
-
-function delLog(k) { if(confirm("이 예약을 삭제하시겠습니까?")) db.ref(`logs/${k}`).remove(); }
-function clearAllLogs() {
-    if(confirm("⚠️ 경고: 모든 예약 명단이 영구적으로 삭제됩니다.")) {
-        db.ref('logs').remove().then(() => alert("삭제되었습니다."));
-    }
-}
-
-function downloadExcel() {
-    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "신청시간":r.date}));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "명단");
-    XLSX.writeFile(wb, "렉스김어학원_예약명단.xlsx");
+    if(!key) return alert("선택된 템플릿이 없습니다.");
+    db.ref(`master/templates/${key}`).remove();
 }
 </script>
 </body>
