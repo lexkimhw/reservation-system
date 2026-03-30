@@ -218,6 +218,7 @@ function renderUserSessions() {
 }
 
 async function doReserve() {
+    // 입력값 가져오기 및 공백 제거
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
     const attendee = document.getElementById('inAttendee').value;
@@ -233,52 +234,82 @@ async function doReserve() {
 
     let existingLogKey = null;
     let oldSessionIdx = null;
-    
-    for (const key in reserveLogs) {
-        if (reserveLogs[key].student === name && reserveLogs[key].phone === phone) {
-            existingLogKey = key;
-            oldSessionIdx = reserveLogs[key].sessionIdx;
-            break;
+    let oldSessionName = "";
+
+    // [수정된 중복 체크 로직]
+    // reserveLogs 내역을 전수 조사하여 이름과 번호가 정확히 일치하는지 확인
+    if (reserveLogs) {
+        for (const key in reserveLogs) {
+            const log = reserveLogs[key];
+            // 이름과 전화번호에서 모든 공백을 제거하고 비교하여 정확도 높임
+            const compareName = log.student.replace(/\s/g, '');
+            const inputName = name.replace(/\s/g, '');
+            
+            if (compareName === inputName && log.phone === phone) {
+                existingLogKey = key;
+                oldSessionIdx = log.sessionIdx;
+                oldSessionName = log.session;
+                break;
+            }
         }
     }
 
-    if (existingLogKey && oldSessionIdx === selectedIdx) {
+    // 동일 회차 중복 신청 방지
+    if (existingLogKey !== null && oldSessionIdx === selectedIdx) {
+        alert(`이미 [${oldSessionName}] 회차에 동일한 정보로 예약되어 있습니다.`);
         btn.disabled = false;
-        return alert(`이미 같은 정보로 예약되어 있습니다.`);
+        return;
     }
 
+    // 다른 회차에 이미 예약된 경우 안내창 띄우기
+    if (existingLogKey !== null) {
+        const confirmChange = confirm(
+            `기존 예약 내역이 확인되었습니다.\n\n` +
+            `기존 회차: ${oldSessionName}\n` +
+            `변경 회차: ${configData.sessions[selectedIdx].name}\n\n` +
+            `신청 회차를 변경하시겠습니까? (기존 예약은 취소됩니다.)`
+        );
+        
+        if (!confirmChange) {
+            btn.disabled = false;
+            return;
+        }
+    }
+
+    // 예약 트랜잭션 시작
     const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
     sessionRef.transaction((session) => {
         if (session) {
-            if (session.cap <= 0) return;
+            if (session.cap <= 0) return; // 정원 부족 시 중단
             session.cap -= 1;
         }
         return session;
     }, async (error, committed) => {
         if (error || !committed) {
-            alert("죄송합니다. 예약이 마감되었습니다.");
+            alert("죄송합니다. 예약이 마감되었거나 오류가 발생했습니다.");
             btn.disabled = false;
         } else {
-            if (existingLogKey && oldSessionIdx !== null) {
+            // [중요] 기존 예약이 있다면 해당 회차 정원 복구 및 기존 로그 삭제
+            if (existingLogKey !== null && oldSessionIdx !== undefined) {
                 await db.ref(`master/sessions/${oldSessionIdx}/cap`).transaction(c => (c || 0) + 1);
                 await db.ref(`logs/${existingLogKey}`).remove();
             }
 
+            // 새로운 예약 로그 저장
             db.ref('logs').push({
                 date: new Date().toLocaleString('ko-KR'),
                 session: configData.sessions[selectedIdx].name,
                 sessionIdx: selectedIdx,
                 student: name,
                 phone: phone,
-                attendee: isBriefing ? attendee : "-" // 설명회일 때만 저장
+                attendee: isBriefing ? attendee : "-"
             }).then(() => {
-                alert("예약이 완료되었습니다.");
+                alert(existingLogKey ? "회차 변경이 완료되었습니다." : "예약이 완료되었습니다.");
                 resetForm();
             });
         }
     });
 }
-
 function resetForm() {
     document.getElementById('inName').value = "";
     document.getElementById('inPhone').value = "";
