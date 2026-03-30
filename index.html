@@ -157,7 +157,7 @@ db.ref('master').on('value', (snap) => {
 
         // 시험 전용 안내 문구 (요청사항 반영)
         if(isExam) {
-            infoTitle.innerHTML = '2. 정보 입력 <span style="font-size:0.8rem; color:#e74c3c; font-weight:normal; margin-left:5px;">(형제, 쌍둥이는 각각 따로 입력 바랍니다.)</span>';
+            infoTitle.innerHTML = '2. 정보 입력 <span style="font-size:0.8rem; color:#e74c3c; font-weight:normal; margin-left:5px;">(형제, 쌍둥이는 각각 따로 입력 바람)</span>';
         } else {
             infoTitle.innerText = '2. 정보 입력';
         }
