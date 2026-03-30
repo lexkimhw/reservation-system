@@ -76,7 +76,6 @@
         <div class="admin-link"><button onclick="checkAuth()">[ 관리자 설정 ]</button></div>
     </div>
 
-    <!-- 관리자 섹션 -->
     <div id="adminSection">
         <div class="admin-nav">
             <button onclick="goHome()">🏠 메인으로</button>
@@ -126,7 +125,7 @@ let configData = { title: "", desc: "", sessions: [], start: "", end: "", templa
 let reserveLogs = {};
 let selectedIdx = null;
 
-// [실시간 데이터 감시]
+// [실시간 데이터 감시 및 UI 업데이트]
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
@@ -139,9 +138,29 @@ db.ref('master').on('value', (snap) => {
         document.getElementById('edStart').value = data.start || "";
         document.getElementById('edEnd').value = data.end || "";
 
+        // --- 모드 체크 로직 ---
         const isBriefing = title.includes("설명회");
-        document.getElementById('briefingOnlyFields').style.display = isBriefing ? "block" : "none";
-        document.getElementById('inName').placeholder = isBriefing ? "학생 한글 이름 (성과 이름 붙여쓰기)" : "학생 한글 이름 (성 과 이름 붙여쓰기): 쌍둥이, 형제 각각 따로 입력";
+        const isExam = title.includes("시험"); // "시험" 포함 여부 체크
+        
+        const briefingDiv = document.getElementById('briefingOnlyFields');
+        const nameInput = document.getElementById('inName');
+        const infoTitle = document.querySelector('#inputForm h3');
+
+        // 설명회 전용 UI
+        if(isBriefing) {
+            briefingDiv.style.display = "block";
+            nameInput.placeholder = "학생 한글 이름 (성과 이름 붙여쓰기)";
+        } else {
+            briefingDiv.style.display = "none";
+            nameInput.placeholder = "학생 한글 이름 (성과 이름 붙여쓰기)";
+        }
+
+        // 시험 전용 안내 문구 (요청사항 반영)
+        if(isExam) {
+            infoTitle.innerHTML = '2. 정보 입력 <span style="font-size:0.8rem; color:#e74c3c; font-weight:normal; margin-left:5px;">(형제, 쌍둥이는 각각 따로 입력 바랍니다.)</span>';
+        } else {
+            infoTitle.innerText = '2. 정보 입력';
+        }
 
         renderTemplateList(data.templates || {});
         updatePeriodStatus();
@@ -170,7 +189,6 @@ async function doReserve() {
 
     const newSessionName = configData.sessions[selectedIdx].name;
 
-    // [스마트 중복 체크]
     const existingLogKey = Object.keys(reserveLogs).find(k => 
         reserveLogs[k].student === name && reserveLogs[k].phone === phone
     );
@@ -204,14 +222,13 @@ async function doReserve() {
                 phone: phone,
                 attendee: isBriefing ? attendee : "-"
             }).then(() => {
-                alert(`예약이 정상적으로 완료되었습니다.`);
+                alert(`예약이 완료되었습니다.`);
                 resetForm();
             });
         }
     });
 }
 
-// 템플릿 관리 함수 (삭제되지 않도록 유지)
 function renderTemplateList(templates) {
     const select = document.getElementById('templateSelect');
     if(!select) return;
@@ -239,7 +256,6 @@ function deleteTemplate() {
     if(confirm("정말 삭제하시겠습니까?")) db.ref(`master/templates/${key}`).remove();
 }
 
-// 공통 유틸리티
 function validateName(obj) { obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, ''); }
 function autoHyphen(obj) {
     let str = obj.value.replace(/[^0-9]/g, '');
@@ -257,7 +273,7 @@ function updatePeriodStatus() {
         el.innerText = "현재 예약 기간이 아닙니다."; el.className = "period-info";
         document.getElementById('inputForm').style.display = 'none';
     } else {
-        el.innerText = `현재 예약 가능 기간 (~ ${configData.end.replace('T', ' ')})`;
+        el.innerText = `현재 예약 가능 기간 (~ ${configData.end ? configData.end.replace('T', ' ') : ''})`;
         el.className = "period-info period-active";
     }
 }
