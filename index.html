@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>렉스김어학원 시험 예약</title>
+    <title>렉스김어학원 예약 시스템</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -25,16 +25,16 @@
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         .btn-main:disabled { background: #ccc; cursor: not-allowed; }
         
-        /* 추가된 안내 문구 스타일 */
         .input-header { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-bottom: 10px; }
         .input-header h3 { margin: 0; }
         .sub-desc { font-size: 0.8rem; color: #777; font-weight: normal; line-height: 1.4; }
+        .warning-text { font-size: 0.85rem; color: #e74c3c; margin-top: 5px; font-weight: bold; }
 
         #adminSection { display: none; margin-top: 10px; }
         .admin-nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
         .admin-row { display: flex; gap: 5px; margin-bottom: 8px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 10px; }
         th, td { border: 1px solid #eee; padding: 8px; text-align: center; }
         .list-ctrl { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; margin-bottom: 10px; }
         .btn-excel { padding: 8px 12px; background: #217346; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
@@ -50,7 +50,7 @@
 <div class="container">
     <div id="userSection">
         <div class="header-area">
-            <h2 id="viewTitle">렉스김어학원 시험 예약</h2>
+            <h2 id="viewTitle">로딩 중...</h2>
             <p id="viewDesc"></p>
         </div>
         <div id="periodDisplay" class="period-info">기간 확인 중...</div>
@@ -63,8 +63,21 @@
                 <h3>2. 정보 입력</h3>
                 <span class="sub-desc">학부모 연락처는 학원에 전화하여 설명회 예약시 말한 연락처입니다.<br>연락처 변경시 010-4967-7807로 문자 부탁 드립니다.</span>
             </div>
-            <input type="text" id="inName" placeholder="학생 이름 (한글/영문)" lang="ko" oninput="validateName(this)">
+            
+            <input type="text" id="inName" placeholder="학생 이름" lang="ko" oninput="validateName(this)">
             <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
+            
+            <!-- 설명회 전용 선택란 -->
+            <div id="briefingOnly" style="display:none;">
+                <select id="inAttendee">
+                    <option value="">-- 설명회 참석자 선택 --</option>
+                    <option value="아버님">아버님</option>
+                    <option value="어머님">어머님</option>
+                    <option value="두분 모두">두분 모두</option>
+                </select>
+                <div class="warning-text">※ 부모님을 대신하여 할아버지, 할머니, 이모, 고모, 아는 지인 참석은 안됩니다.</div>
+            </div>
+
             <button class="btn-main" id="submitBtn" onclick="doReserve()">예약 신청 완료</button>
         </div>
         
@@ -85,7 +98,7 @@
                 <button class="btn-temp" style="background:#e3f2fd;" onclick="saveAsTemplate()">현재 내용 저장</button>
                 <button class="btn-temp" style="background:#ffebee; color:#c62828;" onclick="deleteTemplate()">선택 삭제</button>
             </div>
-            <input type="text" id="edTitle" placeholder="제목">
+            <input type="text" id="edTitle" placeholder="제목 (설명회 또는 시험 단어 포함 필수)">
             <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
             시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
             종료: <input type="datetime-local" id="edEnd">
@@ -104,7 +117,7 @@
             </div>
         </div>
         <table>
-            <thead><tr><th>회차</th><th>이름</th><th>번호</th><th>삭제</th></tr></thead>
+            <thead><tr><th>회차</th><th>이름</th><th>번호</th><th>참석자</th><th>삭제</th></tr></thead>
             <tbody id="resTable"></tbody>
         </table>
     </div>
@@ -125,12 +138,26 @@ db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
         configData = data;
-        document.getElementById('viewTitle').innerText = data.title || "렉스김어학원 시험 예약";
+        const title = data.title || "렉스김어학원 예약";
+        document.getElementById('viewTitle').innerText = title;
         document.getElementById('viewDesc').innerText = data.desc || "";
-        document.getElementById('edTitle').value = data.title || "";
+        document.getElementById('edTitle').value = title;
         document.getElementById('edDesc').value = data.desc || "";
         document.getElementById('edStart').value = data.start || "";
         document.getElementById('edEnd').value = data.end || "";
+        
+        // 제목 키워드에 따른 UI 변경 로직
+        const briefingDiv = document.getElementById('briefingOnly');
+        const nameInput = document.getElementById('inName');
+        
+        if(title.includes("설명회")) {
+            briefingDiv.style.display = "block";
+            nameInput.placeholder = "학생 이름 (한글)";
+        } else if(title.includes("시험")) {
+            briefingDiv.style.display = "none";
+            nameInput.placeholder = "한글만 입력: 형제, 쌍둥이 각각 따로 입력";
+        }
+
         renderTemplateList(data.templates || {});
         updatePeriodStatus();
         renderUserSessions();
@@ -141,7 +168,12 @@ db.ref('master').on('value', (snap) => {
 db.ref('logs').on('value', (snap) => { reserveLogs = snap.val() || {}; renderLogTable(); });
 
 function validateName(obj) {
-    obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, '');
+    // 제목에 '시험'이 포함된 경우에만 숫자/영문 완전 차단 (한글만)
+    if(configData.title.includes("시험")) {
+        obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '');
+    } else {
+        obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, '');
+    }
 }
 
 function isPeriodActive() {
@@ -188,36 +220,31 @@ function renderUserSessions() {
 async function doReserve() {
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
+    const attendee = document.getElementById('inAttendee').value;
+    const isBriefing = configData.title.includes("설명회");
     const btn = document.getElementById('submitBtn');
     
     if(!isPeriodActive()) return alert("기간이 아닙니다.");
     if(!name || !phone || selectedIdx === null) return alert("모든 정보를 입력해주세요.");
+    if(isBriefing && !attendee) return alert("설명회 참석자를 선택해주세요.");
     if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("연락처 형식을 확인해주세요.");
 
     btn.disabled = true;
 
     let existingLogKey = null;
     let oldSessionIdx = null;
-    let oldSessionName = "";
     
     for (const key in reserveLogs) {
         if (reserveLogs[key].student === name && reserveLogs[key].phone === phone) {
             existingLogKey = key;
             oldSessionIdx = reserveLogs[key].sessionIdx;
-            oldSessionName = reserveLogs[key].session;
             break;
         }
     }
 
-    if (existingLogKey) {
-        if (oldSessionIdx === selectedIdx) {
-            btn.disabled = false;
-            return alert(`이미 [${oldSessionName}] 회차에 예약되어 있습니다.`);
-        }
-        if (!confirm(`이미 [${oldSessionName}] 회차에 신청된 내역이 있습니다.\n신청 회차를 [${configData.sessions[selectedIdx].name}]으로 변경하시겠습니까?`)) {
-            btn.disabled = false;
-            return;
-        }
+    if (existingLogKey && oldSessionIdx === selectedIdx) {
+        btn.disabled = false;
+        return alert(`이미 같은 정보로 예약되어 있습니다.`);
     }
 
     const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
@@ -227,9 +254,9 @@ async function doReserve() {
             session.cap -= 1;
         }
         return session;
-    }, async (error, committed, snapshot) => {
+    }, async (error, committed) => {
         if (error || !committed) {
-            alert("죄송합니다. 예약이 방금 마감되었거나 오류가 발생했습니다.");
+            alert("죄송합니다. 예약이 마감되었습니다.");
             btn.disabled = false;
         } else {
             if (existingLogKey && oldSessionIdx !== null) {
@@ -242,9 +269,10 @@ async function doReserve() {
                 session: configData.sessions[selectedIdx].name,
                 sessionIdx: selectedIdx,
                 student: name,
-                phone: phone
+                phone: phone,
+                attendee: isBriefing ? attendee : "-" // 설명회일 때만 저장
             }).then(() => {
-                alert(existingLogKey ? "예약 회차가 변경되었습니다." : `${name}님, 예약이 완료되었습니다.`);
+                alert("예약이 완료되었습니다.");
                 resetForm();
             });
         }
@@ -254,6 +282,7 @@ async function doReserve() {
 function resetForm() {
     document.getElementById('inName').value = "";
     document.getElementById('inPhone').value = "";
+    document.getElementById('inAttendee').value = "";
     document.getElementById('submitBtn').disabled = false;
     selectedIdx = null;
     document.getElementById('inputForm').style.display = 'none';
@@ -297,7 +326,7 @@ function saveAdminSettings() {
         start: document.getElementById('edStart').value,
         end: document.getElementById('edEnd').value,
         sessions: sessionRows
-    }).then(() => alert("저장 완료"));
+    }).then(() => alert("설정이 저장되었습니다."));
 }
 
 function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
@@ -307,12 +336,12 @@ function renderLogTable() {
     const body = document.getElementById('resTable'); body.innerHTML = "";
     Object.keys(reserveLogs).reverse().forEach(k => { 
         const r = reserveLogs[k]; 
-        body.innerHTML += `<tr><td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; 
+        body.innerHTML += `<tr><td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td>${r.attendee || '-'}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; 
     });
 }
 
 async function delLog(k) {
-    if(confirm("삭제하시겠습니까? (삭제 시 해당 회차 정원이 1명 복구됩니다.)")) {
+    if(confirm("삭제하시겠습니까? 정원이 1명 복구됩니다.")) {
         const log = reserveLogs[k];
         if (log && log.sessionIdx !== undefined) {
             await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(c => (c || 0) + 1);
@@ -321,10 +350,10 @@ async function delLog(k) {
     }
 }
 
-function clearAllLogs() { if(confirm("전체 삭제하시겠습니까? (정원 복구 없이 명단만 비워집니다.)")) db.ref('logs').remove(); }
+function clearAllLogs() { if(confirm("명단을 전체 삭제하시겠습니까?")) db.ref('logs').remove(); }
 
 function downloadExcel() {
-    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "신청시간":r.date}));
+    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "참석자":r.attendee, "회차":r.session, "신청시간":r.date}));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "명단");
