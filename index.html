@@ -141,7 +141,7 @@ db.ref('master').on('value', (snap) => {
 
         const isBriefing = title.includes("설명회");
         document.getElementById('briefingOnlyFields').style.display = isBriefing ? "block" : "none";
-        document.getElementById('inName').placeholder = isBriefing ? "학생 이름 (한글)" : "학생 이름 (한글/영문)";
+        document.getElementById('inName').placeholder = isBriefing ? "학생 이름 (한글)" : "학생 이름 (한글): 쌍둥이, 형제 각각 따로 입력";
 
         renderTemplateList(data.templates || {});
         updatePeriodStatus();
