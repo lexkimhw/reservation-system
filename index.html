@@ -24,6 +24,12 @@
         input, textarea, select { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         .btn-main:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* 추가된 안내 문구 스타일 */
+        .input-header { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-bottom: 10px; }
+        .input-header h3 { margin: 0; }
+        .sub-desc { font-size: 0.8rem; color: #777; font-weight: normal; line-height: 1.4; }
+
         #adminSection { display: none; margin-top: 10px; }
         .admin-nav { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .admin-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
@@ -53,7 +59,10 @@
         <div id="sessionList" class="session-list"></div>
         
         <div id="inputForm" style="display:none;">
-            <h3>2. 정보 입력</h3>
+            <div class="input-header">
+                <h3>2. 정보 입력</h3>
+                <span class="sub-desc">학부모 연락처는 학원에 전화하여 설명회 예약시 말한 연락처입니다.<br>연락처 변경시 010-4967-7807로 문자 부탁 드립니다.</span>
+            </div>
             <input type="text" id="inName" placeholder="학생 이름 (한글/영문)" lang="ko" oninput="validateName(this)">
             <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
             <button class="btn-main" id="submitBtn" onclick="doReserve()">예약 신청 완료</button>
@@ -176,7 +185,6 @@ function renderUserSessions() {
     });
 }
 
-// [핵심 로직] 예약 신청 및 중복 변경 처리
 async function doReserve() {
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
@@ -188,7 +196,6 @@ async function doReserve() {
 
     btn.disabled = true;
 
-    // 1. 중복 확인
     let existingLogKey = null;
     let oldSessionIdx = null;
     let oldSessionName = "";
@@ -213,11 +220,10 @@ async function doReserve() {
         }
     }
 
-    // 2. 예약 트랜잭션 (정원 차감)
     const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
     sessionRef.transaction((session) => {
         if (session) {
-            if (session.cap <= 0) return; // 마감됨
+            if (session.cap <= 0) return;
             session.cap -= 1;
         }
         return session;
@@ -226,17 +232,15 @@ async function doReserve() {
             alert("죄송합니다. 예약이 방금 마감되었거나 오류가 발생했습니다.");
             btn.disabled = false;
         } else {
-            // 기존 예약이 있었던 경우 기존 회차 정원 복구
             if (existingLogKey && oldSessionIdx !== null) {
                 await db.ref(`master/sessions/${oldSessionIdx}/cap`).transaction(c => (c || 0) + 1);
                 await db.ref(`logs/${existingLogKey}`).remove();
             }
 
-            // 로그 작성
             db.ref('logs').push({
                 date: new Date().toLocaleString('ko-KR'),
                 session: configData.sessions[selectedIdx].name,
-                sessionIdx: selectedIdx, // 복구용 인덱스 저장
+                sessionIdx: selectedIdx,
                 student: name,
                 phone: phone
             }).then(() => {
@@ -307,12 +311,10 @@ function renderLogTable() {
     });
 }
 
-// [핵심 로직] 관리자 삭제 시 정원 복구
 async function delLog(k) {
     if(confirm("삭제하시겠습니까? (삭제 시 해당 회차 정원이 1명 복구됩니다.)")) {
         const log = reserveLogs[k];
         if (log && log.sessionIdx !== undefined) {
-            // 해당 회차 정원 1 증가
             await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(c => (c || 0) + 1);
         }
         db.ref(`logs/${k}`).remove();
