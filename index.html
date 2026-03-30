@@ -155,7 +155,7 @@ db.ref('master').on('value', (snap) => {
             nameInput.placeholder = "학생 이름 (한글)";
         } else if(title.includes("시험")) {
             briefingDiv.style.display = "none";
-            nameInput.placeholder = "한글만 입력: 형제, 쌍둥이 각각 따로 입력";
+            nameInput.placeholder = "학생 이름 (한글) : 형제, 쌍둥이 각각 따로 입력";
         }
 
         renderTemplateList(data.templates || {});
