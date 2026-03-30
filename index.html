@@ -20,7 +20,7 @@
         .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; background: #fff; position: relative; }
         .session-item.disabled { opacity: 0.5; cursor: not-allowed; background: #f9f9f9; }
         .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; box-shadow: 0 4px 12px rgba(0,86,179,0.1); }
-        .rem-tag { float: right; font-weight: bold; }
+        .rem-tag { float: right; font-weight: bold; color: #e74c3c; }
         input, textarea, select { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
         .btn-main:disabled { background: #ccc; cursor: not-allowed; }
@@ -42,7 +42,7 @@
 <div class="container">
     <div id="userSection">
         <div class="header-area">
-            <h2 id="viewTitle">로딩 중...</h2>
+            <h2 id="viewTitle">렉스김어학원 시험 예약</h2>
             <p id="viewDesc"></p>
         </div>
         <div id="periodDisplay" class="period-info">기간 확인 중...</div>
@@ -52,34 +52,38 @@
         
         <div id="inputForm" style="display:none;">
             <h3>2. 정보 입력</h3>
-            <input type="text" id="inName" placeholder="학생 이름 (한글)" lang="ko" oninput="validateName(this)">
-            <input type="text" id="inPhone" placeholder="학부모님 연락처 (010-0000-0000)" maxlength="13" oninput="autoHyphen(this)">
+            <input type="text" id="inName" placeholder="학생 이름 (한글/영문)" lang="ko" oninput="validateName(this)">
+            <input type="text" id="inPhone" placeholder="학부모님 연락처" maxlength="13" oninput="autoHyphen(this)">
             <button class="btn-main" id="submitBtn" onclick="doReserve()">예약 신청 완료</button>
         </div>
         
         <div class="admin-link"><button onclick="checkAuth()">[ 관리자 설정 ]</button></div>
     </div>
 
-    <!-- 관리자 섹션 생략 (기존과 동일하되 명단 관리 기능 유지) -->
     <div id="adminSection">
-        <div class="admin-nav"><button onclick="goHome()">🏠 메인</button><strong>관리자</strong></div>
+        <div class="admin-nav">
+            <button onclick="goHome()">🏠 메인으로</button>
+            <strong>관리자 설정</strong>
+        </div>
         <div class="admin-box">
+            <strong>공지 및 예약 기간 설정</strong>
             <input type="text" id="edTitle" placeholder="제목">
-            <textarea id="edDesc" rows="3" placeholder="안내"></textarea>
-            시작: <input type="datetime-local" id="edStart"><br>
+            <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
+            시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
             종료: <input type="datetime-local" id="edEnd">
         </div>
         <div class="admin-box">
+            <strong>회차 및 정원 관리</strong>
             <div id="edSessions"></div>
             <button onclick="addSessionRow()">+ 회차 추가</button>
         </div>
-        <button class="btn-main" style="background:#333;" onclick="saveAdminSettings()">설정 저장</button>
+        <button class="btn-main" style="background:#333;" onclick="saveAdminSettings()">설정 저장 및 적용</button>
         
         <div class="list-ctrl">
-            <strong>예약 명단</strong>
+            <strong>실시간 예약 명단</strong>
             <div>
-                <button class="btn-excel" onclick="downloadExcel()">엑셀</button>
-                <button class="btn-clear" onclick="clearAllLogs()">전체삭제</button>
+                <button class="btn-excel" onclick="downloadExcel()">엑셀 저장</button>
+                <button class="btn-clear" onclick="clearAllLogs()">⚠️ 전체 삭제</button>
             </div>
         </div>
         <table>
@@ -98,25 +102,25 @@ let configData = { title: "", desc: "", sessions: [], start: "", end: "" };
 let reserveLogs = {};
 let selectedIdx = null;
 
-// 데이터 로드
+// [데이터 실시간 감시]
 db.ref('master').on('value', (snap) => {
-    configData = snap.val() || configData;
-    document.getElementById('viewTitle').innerText = configData.title || "시험 예약";
-    document.getElementById('viewDesc').innerText = configData.desc || "";
-    updatePeriodStatus();
-    renderUserSessions();
-    renderAdminSessions();
+    const data = snap.val();
+    if(data) {
+        configData = data;
+        document.getElementById('viewTitle').innerText = data.title || "렉스김어학원 시험 예약";
+        document.getElementById('viewDesc').innerText = data.desc || "";
+        document.getElementById('edTitle').value = data.title || "";
+        document.getElementById('edDesc').value = data.desc || "";
+        document.getElementById('edStart').value = data.start || "";
+        document.getElementById('edEnd').value = data.end || "";
+        updatePeriodStatus();
+        renderUserSessions();
+        renderAdminSessions();
+    }
 });
 db.ref('logs').on('value', (snap) => { reserveLogs = snap.val() || {}; renderLogTable(); });
 
 function validateName(obj) { obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, ''); }
-function autoHyphen(obj) {
-    let str = obj.value.replace(/[^0-9]/g, '');
-    if (str.length < 4) obj.value = str;
-    else if (str.length < 11) obj.value = str.substr(0, 3) + '-' + str.substr(3, 3) + '-' + str.substr(6);
-    else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
-}
-
 function isPeriodActive() {
     if(!configData.start || !configData.end) return true;
     const now = new Date();
@@ -126,10 +130,12 @@ function isPeriodActive() {
 function updatePeriodStatus() {
     const el = document.getElementById('periodDisplay');
     if(!isPeriodActive()) {
-        el.innerText = "예약 기간이 아닙니다.";
+        el.innerText = "현재 예약 기간이 아닙니다.";
         el.className = "period-info";
+        document.getElementById('inputForm').style.display = 'none';
+        selectedIdx = null;
     } else {
-        el.innerText = `예약 가능 (~ ${configData.end.replace('T', ' ')})`;
+        el.innerText = `현재 예약 가능 기간 (~ ${configData.end.replace('T', ' ')})`;
         el.className = "period-info period-active";
     }
 }
@@ -137,30 +143,32 @@ function updatePeriodStatus() {
 function renderUserSessions() {
     const div = document.getElementById('sessionList'); 
     div.innerHTML = "";
+    const active = isPeriodActive();
     (configData.sessions || []).forEach((s, i) => {
         const isSoldOut = s.cap <= 0;
         const item = document.createElement('div');
-        item.className = `session-item ${isSoldOut ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
+        item.className = `session-item ${(!active || isSoldOut) ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
         item.onclick = () => {
-            if(isSoldOut) return alert("마감된 회차입니다.");
+            if(!active) return alert("현재 입력 시간이 아닙니다.");
+            if(isSoldOut) return alert("해당 회차는 마감되었습니다.");
             selectedIdx = i; 
             renderUserSessions();
             document.getElementById('inputForm').style.display = 'block';
         };
-        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${isSoldOut ? '마감' : '잔여 '+s.cap+'석'}</span><strong>${s.name}</strong>`;
+        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${isSoldOut ? "마감" : `잔여 ${s.cap}석`}</span><strong>${s.name}</strong>`;
         div.appendChild(item);
     });
 }
 
-// 핵심 기능: 예약 및 중복 시 변경 처리
+// [핵심 로직: 중복 확인 및 회차 변경]
 async function doReserve() {
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
     const btn = document.getElementById('submitBtn');
     
     if(!isPeriodActive()) return alert("기간이 아닙니다.");
-    if(!name || !phone || selectedIdx === null) return alert("정보를 모두 입력하세요.");
-    if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("번호 형식을 확인하세요.");
+    if(!name || !phone || selectedIdx === null) return alert("모든 정보를 입력해주세요.");
+    if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("연락처 형식을 확인해주세요.");
 
     btn.disabled = true;
 
@@ -168,8 +176,7 @@ async function doReserve() {
     let existingKey = null;
     let oldSessionIdx = null;
     let oldSessionName = "";
-
-    for(let key in reserveLogs) {
+    for(const key in reserveLogs) {
         if(reserveLogs[key].student === name && reserveLogs[key].phone === phone) {
             existingKey = key;
             oldSessionIdx = reserveLogs[key].sessionIdx;
@@ -181,49 +188,46 @@ async function doReserve() {
     if(existingKey) {
         if(oldSessionIdx === selectedIdx) {
             btn.disabled = false;
-            return alert(`이미 [${oldSessionName}]에 예약되어 있습니다.`);
+            return alert(`이미 [${oldSessionName}] 회차에 예약되어 있습니다.`);
         }
-        if(!confirm(`이미 [${oldSessionName}]에 예약 내역이 있습니다.\n[${configData.sessions[selectedIdx].name}]으로 변경하시겠습니까?`)) {
+        if(!confirm(`이미 [${oldSessionName}] 회차에 신청된 내역이 있습니다.\n신청 회차를 [${configData.sessions[selectedIdx].name}]으로 변경하시겠습니까?`)) {
             btn.disabled = false;
             return;
         }
     }
 
-    const newSessionRef = db.ref(`master/sessions/${selectedIdx}`);
-    
-    try {
-        // 2. 트랜잭션 처리 (변경인 경우 기존 회차 복구 포함)
-        await newSessionRef.transaction((session) => {
-            if (session && session.cap > 0) {
-                session.cap -= 1;
-                return session;
-            }
-            return; // 마감됨
-        }).then(async (result) => {
-            if(!result.committed) throw new Error("마감");
-
-            // 기존 예약이 있었을 경우 기존 회차 1석 복구
-            if(existingKey && oldSessionIdx !== null) {
-                await db.ref(`master/sessions/${oldSessionIdx}/cap`).transaction(c => (c || 0) + 1);
+    // 2. 예약 실행 (트랜잭션)
+    const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
+    sessionRef.transaction((session) => {
+        if (session && session.cap > 0) {
+            session.cap -= 1;
+            return session;
+        }
+        return; 
+    }, async (error, committed, snapshot) => {
+        if (error || !committed) {
+            alert("죄송합니다. 예약이 방금 마감되었습니다.");
+            btn.disabled = false;
+        } else {
+            // 기존 예약이 있었던 경우 기존 회차 복구 및 이전 로그 삭제
+            if(existingKey) {
+                await db.ref(`master/sessions/${oldSessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
                 await db.ref(`logs/${existingKey}`).remove();
             }
 
-            // 3. 로그 작성
-            await db.ref('logs').push({
+            // 새 로그 추가
+            db.ref('logs').push({
                 date: new Date().toLocaleString('ko-KR'),
                 session: configData.sessions[selectedIdx].name,
-                sessionIdx: selectedIdx,
+                sessionIdx: selectedIdx, // 복구용 인덱스 저장
                 student: name,
                 phone: phone
+            }).then(() => {
+                alert(existingKey ? "회차 변경이 완료되었습니다." : `${name}님, 예약이 완료되었습니다.`);
+                resetForm();
             });
-
-            alert(existingKey ? "예약 회차가 변경되었습니다." : "예약이 완료되었습니다.");
-            resetForm();
-        });
-    } catch(e) {
-        alert("죄송합니다. 그 사이 예약이 마감되었습니다.");
-        btn.disabled = false;
-    }
+        }
+    });
 }
 
 function resetForm() {
@@ -234,18 +238,15 @@ function resetForm() {
     document.getElementById('inputForm').style.display = 'none';
 }
 
-// 관리자 관련 함수 (삭제 시 복구 포함)
-async function delLog(k) {
-    if(!confirm("삭제하시겠습니까? (삭제 시 해당 회차 1석 복구)")) return;
-    const log = reserveLogs[k];
-    if(log && log.sessionIdx !== undefined) {
-        await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(c => (c || 0) + 1);
-    }
-    db.ref(`logs/${k}`).remove();
+function autoHyphen(obj) {
+    let str = obj.value.replace(/[^0-9]/g, '');
+    if (str.length < 4) obj.value = str;
+    else if (str.length < 11) obj.value = str.substr(0, 3) + '-' + str.substr(3, 3) + '-' + str.substr(6);
+    else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
 }
 
-// 이하 관리자 UI 보조 함수들은 기존과 동일하게 유지
-function checkAuth() { if(prompt("암호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
+// [관리자 기능]
+function checkAuth() { if(prompt("관리자 암호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
 function goHome() { document.getElementById('adminSection').style.display='none'; document.getElementById('userSection').style.display='block'; }
 function renderAdminSessions() {
     const div = document.getElementById('edSessions'); div.innerHTML = "";
@@ -256,7 +257,7 @@ function renderAdminSessions() {
 function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
 function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
 function saveAdminSettings() {
-    const sessions = configData.sessions.map((_, i) => ({
+    const sessionRows = (configData.sessions || []).map((_, i) => ({
         name: document.getElementById(`sn${i}`).value,
         cap: parseInt(document.getElementById(`sc${i}`).value)
     }));
@@ -265,19 +266,32 @@ function saveAdminSettings() {
         desc: document.getElementById('edDesc').value,
         start: document.getElementById('edStart').value,
         end: document.getElementById('edEnd').value,
-        sessions: sessions
-    }).then(() => alert("저장됨"));
+        sessions: sessionRows
+    }).then(() => alert("설정 저장 완료"));
 }
+
 function renderLogTable() {
     const body = document.getElementById('resTable'); body.innerHTML = "";
-    Object.keys(reserveLogs).reverse().forEach(k => {
-        const r = reserveLogs[k];
-        body.innerHTML += `<tr><td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">삭제</button></td></tr>`;
+    Object.keys(reserveLogs).reverse().forEach(k => { 
+        const r = reserveLogs[k]; 
+        body.innerHTML += `<tr><td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td><button onclick="delLog('${k}')">X</button></td></tr>`; 
     });
 }
-function clearAllLogs() { if(confirm("전체 삭제?")) db.ref('logs').remove(); }
+
+// [핵심 로직: 삭제 시 정원 복구]
+async function delLog(k) {
+    if(confirm("삭제하시겠습니까? (삭제 시 해당 회차 정원 1석이 복구됩니다.)")) {
+        const log = reserveLogs[k];
+        if(log && log.sessionIdx !== undefined) {
+            await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
+        }
+        db.ref(`logs/${k}`).remove();
+    }
+}
+
+function clearAllLogs() { if(confirm("전체 삭제하시겠습니까?")) db.ref('logs').remove(); }
 function downloadExcel() {
-    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "시간":r.date}));
+    const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "신청시간":r.date}));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "명단");
