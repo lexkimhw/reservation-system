@@ -19,7 +19,7 @@
         .session-list { display: grid; gap: 10px; margin-bottom: 20px; }
         .session-item { border: 1px solid #e1e4e8; padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.2s; background: #fff; position: relative; }
         .session-item.disabled { opacity: 0.5; cursor: not-allowed; background: #f9f9f9; }
-        .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; box-shadow: 0 4px 12px rgba(0,86,179,0.1); }
+        .session-item.selected { border: 2px solid var(--p-color); background: #f0f7ff; box-shadow: 0 4px 10px rgba(0,86,179,0.1); }
         .rem-tag { float: right; font-weight: bold; color: #e74c3c; }
         input, textarea, select { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; font-family: inherit; }
         .btn-main { width: 100%; padding: 16px; background: var(--p-color); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 15px; }
@@ -35,6 +35,8 @@
         .btn-clear { padding: 8px 12px; background: #fff; color: #e74c3c; border: 1px solid #e74c3c; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
         .admin-link { text-align: center; margin-top: 40px; }
         .admin-link button { background: none; border: none; color: #aaa; text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
+        .temp-ctrl { display: flex; gap: 5px; margin-bottom: 5px; }
+        .btn-temp { flex: 1; padding: 8px; font-size: 0.8rem; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -67,6 +69,13 @@
         </div>
         <div class="admin-box">
             <strong>공지 및 예약 기간 설정</strong>
+            <select id="templateSelect" onchange="loadTemplate(this.value)" style="margin-bottom: 5px;">
+                <option value="">-- 저장된 템플릿 선택 --</option>
+            </select>
+            <div class="temp-ctrl">
+                <button class="btn-temp" style="background:#e3f2fd;" onclick="saveAsTemplate()">현재 내용 저장</button>
+                <button class="btn-temp" style="background:#ffebee; color:#c62828;" onclick="deleteTemplate()">선택 삭제</button>
+            </div>
             <input type="text" id="edTitle" placeholder="제목">
             <textarea id="edDesc" rows="3" placeholder="안내 문구 입력"></textarea>
             시작: <input type="datetime-local" id="edStart" style="margin-bottom:5px;"><br>
@@ -78,7 +87,6 @@
             <button onclick="addSessionRow()">+ 회차 추가</button>
         </div>
         <button class="btn-main" style="background:#333;" onclick="saveAdminSettings()">설정 저장 및 적용</button>
-        
         <div class="list-ctrl">
             <strong>실시간 예약 명단</strong>
             <div>
@@ -94,15 +102,16 @@
 </div>
 
 <script>
-const firebaseConfig = { databaseURL: "https://lexkimhw-63c3b-default-rtdb.asia-southeast1.firebasedatabase.app/" };
+const firebaseConfig = { 
+    databaseURL: "https://lexkimhw-63c3b-default-rtdb.asia-southeast1.firebasedatabase.app/" 
+};
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let configData = { title: "", desc: "", sessions: [], start: "", end: "" };
+let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
 let reserveLogs = {};
 let selectedIdx = null;
 
-// [데이터 실시간 감시]
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
@@ -113,14 +122,19 @@ db.ref('master').on('value', (snap) => {
         document.getElementById('edDesc').value = data.desc || "";
         document.getElementById('edStart').value = data.start || "";
         document.getElementById('edEnd').value = data.end || "";
+        renderTemplateList(data.templates || {});
         updatePeriodStatus();
         renderUserSessions();
         renderAdminSessions();
     }
 });
+
 db.ref('logs').on('value', (snap) => { reserveLogs = snap.val() || {}; renderLogTable(); });
 
-function validateName(obj) { obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, ''); }
+function validateName(obj) {
+    obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, '');
+}
+
 function isPeriodActive() {
     if(!configData.start || !configData.end) return true;
     const now = new Date();
@@ -135,7 +149,8 @@ function updatePeriodStatus() {
         document.getElementById('inputForm').style.display = 'none';
         selectedIdx = null;
     } else {
-        el.innerText = `현재 예약 가능 기간 (~ ${configData.end.replace('T', ' ')})`;
+        const eStr = (configData.end || "").replace('T', ' ');
+        el.innerText = `현재 예약 가능 기간 (~ ${eStr})`;
         el.className = "period-info period-active";
     }
 }
@@ -155,12 +170,13 @@ function renderUserSessions() {
             renderUserSessions();
             document.getElementById('inputForm').style.display = 'block';
         };
-        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${isSoldOut ? "마감" : `잔여 ${s.cap}석`}</span><strong>${s.name}</strong>`;
+        const statusText = isSoldOut ? "마감" : `잔여 ${s.cap}석`;
+        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${statusText}</span><strong>${s.name}</strong>`;
         div.appendChild(item);
     });
 }
 
-// [핵심 로직: 중복 확인 및 회차 변경]
+// [핵심 로직] 예약 신청 및 중복 변경 처리
 async function doReserve() {
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
@@ -172,50 +188,51 @@ async function doReserve() {
 
     btn.disabled = true;
 
-    // 1. 중복 체크
-    let existingKey = null;
+    // 1. 중복 확인
+    let existingLogKey = null;
     let oldSessionIdx = null;
     let oldSessionName = "";
-    for(const key in reserveLogs) {
-        if(reserveLogs[key].student === name && reserveLogs[key].phone === phone) {
-            existingKey = key;
+    
+    for (const key in reserveLogs) {
+        if (reserveLogs[key].student === name && reserveLogs[key].phone === phone) {
+            existingLogKey = key;
             oldSessionIdx = reserveLogs[key].sessionIdx;
             oldSessionName = reserveLogs[key].session;
             break;
         }
     }
 
-    if(existingKey) {
-        if(oldSessionIdx === selectedIdx) {
+    if (existingLogKey) {
+        if (oldSessionIdx === selectedIdx) {
             btn.disabled = false;
             return alert(`이미 [${oldSessionName}] 회차에 예약되어 있습니다.`);
         }
-        if(!confirm(`이미 [${oldSessionName}] 회차에 신청된 내역이 있습니다.\n신청 회차를 [${configData.sessions[selectedIdx].name}]으로 변경하시겠습니까?`)) {
+        if (!confirm(`이미 [${oldSessionName}] 회차에 신청된 내역이 있습니다.\n신청 회차를 [${configData.sessions[selectedIdx].name}]으로 변경하시겠습니까?`)) {
             btn.disabled = false;
             return;
         }
     }
 
-    // 2. 예약 실행 (트랜잭션)
+    // 2. 예약 트랜잭션 (정원 차감)
     const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
     sessionRef.transaction((session) => {
-        if (session && session.cap > 0) {
+        if (session) {
+            if (session.cap <= 0) return; // 마감됨
             session.cap -= 1;
-            return session;
         }
-        return; 
+        return session;
     }, async (error, committed, snapshot) => {
         if (error || !committed) {
-            alert("죄송합니다. 예약이 방금 마감되었습니다.");
+            alert("죄송합니다. 예약이 방금 마감되었거나 오류가 발생했습니다.");
             btn.disabled = false;
         } else {
-            // 기존 예약이 있었던 경우 기존 회차 복구 및 이전 로그 삭제
-            if(existingKey) {
-                await db.ref(`master/sessions/${oldSessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
-                await db.ref(`logs/${existingKey}`).remove();
+            // 기존 예약이 있었던 경우 기존 회차 정원 복구
+            if (existingLogKey && oldSessionIdx !== null) {
+                await db.ref(`master/sessions/${oldSessionIdx}/cap`).transaction(c => (c || 0) + 1);
+                await db.ref(`logs/${existingLogKey}`).remove();
             }
 
-            // 새 로그 추가
+            // 로그 작성
             db.ref('logs').push({
                 date: new Date().toLocaleString('ko-KR'),
                 session: configData.sessions[selectedIdx].name,
@@ -223,7 +240,7 @@ async function doReserve() {
                 student: name,
                 phone: phone
             }).then(() => {
-                alert(existingKey ? "회차 변경이 완료되었습니다." : `${name}님, 예약이 완료되었습니다.`);
+                alert(existingLogKey ? "예약 회차가 변경되었습니다." : `${name}님, 예약이 완료되었습니다.`);
                 resetForm();
             });
         }
@@ -236,6 +253,7 @@ function resetForm() {
     document.getElementById('submitBtn').disabled = false;
     selectedIdx = null;
     document.getElementById('inputForm').style.display = 'none';
+    renderUserSessions();
 }
 
 function autoHyphen(obj) {
@@ -245,17 +263,25 @@ function autoHyphen(obj) {
     else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
 }
 
-// [관리자 기능]
-function checkAuth() { if(prompt("관리자 암호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
-function goHome() { document.getElementById('adminSection').style.display='none'; document.getElementById('userSection').style.display='block'; }
+function checkAuth() { 
+    if(prompt("관리자 암호") === "5556575") { 
+        document.getElementById('userSection').style.display='none'; 
+        document.getElementById('adminSection').style.display='block'; 
+    } 
+}
+
+function goHome() { 
+    document.getElementById('adminSection').style.display='none'; 
+    document.getElementById('userSection').style.display='block'; 
+}
+
 function renderAdminSessions() {
     const div = document.getElementById('edSessions'); div.innerHTML = "";
     (configData.sessions || []).forEach((s, i) => {
         div.innerHTML += `<div class="admin-row"><input type="text" id="sn${i}" value="${s.name}" style="flex:3"><input type="number" id="sc${i}" value="${s.cap}" style="flex:1"><button onclick="removeRow(${i})">X</button></div>`;
     });
 }
-function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
-function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
+
 function saveAdminSettings() {
     const sessionRows = (configData.sessions || []).map((_, i) => ({
         name: document.getElementById(`sn${i}`).value,
@@ -267,8 +293,11 @@ function saveAdminSettings() {
         start: document.getElementById('edStart').value,
         end: document.getElementById('edEnd').value,
         sessions: sessionRows
-    }).then(() => alert("설정 저장 완료"));
+    }).then(() => alert("저장 완료"));
 }
+
+function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name:"", cap:20}); renderAdminSessions(); }
+function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
 
 function renderLogTable() {
     const body = document.getElementById('resTable'); body.innerHTML = "";
@@ -278,24 +307,58 @@ function renderLogTable() {
     });
 }
 
-// [핵심 로직: 삭제 시 정원 복구]
+// [핵심 로직] 관리자 삭제 시 정원 복구
 async function delLog(k) {
-    if(confirm("삭제하시겠습니까? (삭제 시 해당 회차 정원 1석이 복구됩니다.)")) {
+    if(confirm("삭제하시겠습니까? (삭제 시 해당 회차 정원이 1명 복구됩니다.)")) {
         const log = reserveLogs[k];
-        if(log && log.sessionIdx !== undefined) {
-            await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
+        if (log && log.sessionIdx !== undefined) {
+            // 해당 회차 정원 1 증가
+            await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(c => (c || 0) + 1);
         }
         db.ref(`logs/${k}`).remove();
     }
 }
 
-function clearAllLogs() { if(confirm("전체 삭제하시겠습니까?")) db.ref('logs').remove(); }
+function clearAllLogs() { if(confirm("전체 삭제하시겠습니까? (정원 복구 없이 명단만 비워집니다.)")) db.ref('logs').remove(); }
+
 function downloadExcel() {
     const data = Object.values(reserveLogs).map(r => ({"학생":r.student, "번호":r.phone, "회차":r.session, "신청시간":r.date}));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "명단");
     XLSX.writeFile(wb, "예약명단.xlsx");
+}
+
+function renderTemplateList(templates) {
+    const select = document.getElementById('templateSelect');
+    if(!select) return;
+    select.innerHTML = '<option value="">-- 저장된 템플릿 선택 --</option>';
+    Object.keys(templates).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.innerText = templates[key].title;
+        select.appendChild(opt);
+    });
+}
+
+function loadTemplate(key) {
+    if(!key || !configData.templates[key]) return;
+    const item = configData.templates[key];
+    document.getElementById('edTitle').value = item.title;
+    document.getElementById('edDesc').value = item.desc;
+}
+
+function saveAsTemplate() {
+    const title = document.getElementById('edTitle').value.trim();
+    const desc = document.getElementById('edDesc').value.trim();
+    if(!title || !desc) return alert("내용을 입력하세요.");
+    db.ref('master/templates').push({ title, desc }).then(() => alert("템플릿 저장 완료"));
+}
+
+function deleteTemplate() {
+    const key = document.getElementById('templateSelect').value;
+    if(!key) return alert("선택된 템플릿이 없습니다.");
+    db.ref(`master/templates/${key}`).remove();
 }
 </script>
 </body>
