@@ -118,10 +118,19 @@
 </div>
 
 <script>
-const firebaseConfig = { databaseURL: "https://lexkimhw-63c3b-default-rtdb.asia-southeast1.firebasedatabase.app/" };
+const firebaseConfig = {
+    apiKey: "AIzaSyB-kM... (Firebase 콘솔에서 확인 가능)", // 필수!
+    authDomain: "lexkimhw-63c3b.firebaseapp.com",
+    databaseURL: "https://lexkimhw-63c3b-default-rtdb.asia-southeast1.firebasedatabase.app/",
+    projectId: "lexkimhw-63c3b",
+    storageBucket: "lexkimhw-63c3b.appspot.com",
+    messagingSenderId: "374246824963",
+    appId: "1:374246824963:web:ce4b706c645b349f871545"
+};
+
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
+const auth = firebase.auth(); // 이 줄을 추가하면 관리가 더 편해집니다.
 let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
 let reserveLogs = {};
 let selectedIdx = null;
