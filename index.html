@@ -319,7 +319,9 @@ function goHome() {
     firebase.auth().signOut(); // 로그아웃하여 보안 유지
     document.getElementById('adminSection').style.display = 'none';
     document.getElementById('userSection').style.display = 'block';
-}function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
+}
+
+function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
 function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
 function saveAdminSettings() {
     const sessionRows = (configData.sessions || []).map((_, i) => ({ name: document.getElementById(`sn${i}`).value, cap: parseInt(document.getElementById(`sc${i}`).value) || 0 }));
