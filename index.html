@@ -297,7 +297,7 @@ function resetForm() {
 }
 async function checkAuth() {
     const email = "lexkimhw@gmail.com"; // 관리자 이메일 (콘솔에서 생성)
-    const password = prompt("5556575");
+    const password = prompt("관리자 비밀번호를 입력하세요.");
 
     if (!password) return;
 
@@ -319,9 +319,7 @@ function goHome() {
     firebase.auth().signOut(); // 로그아웃하여 보안 유지
     document.getElementById('adminSection').style.display = 'none';
     document.getElementById('userSection').style.display = 'block';
-}
-
-function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
+}function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
 function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
 function saveAdminSettings() {
     const sessionRows = (configData.sessions || []).map((_, i) => ({ name: document.getElementById(`sn${i}`).value, cap: parseInt(document.getElementById(`sc${i}`).value) || 0 }));
