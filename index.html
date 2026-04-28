@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>렉스김어학원 예약 시스템</title>
+     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -294,14 +295,32 @@ function resetForm() {
     selectedIdx = null; document.getElementById('inputForm').style.display = 'none';
     renderUserSessions();
 }
-function checkAuth() { if(prompt("비밀번호") === "5556575") { document.getElementById('userSection').style.display='none'; document.getElementById('adminSection').style.display='block'; } }
-function goHome() { document.getElementById('adminSection').style.display='none'; document.getElementById('userSection').style.display='block'; }
-function renderAdminSessions() {
-    const div = document.getElementById('edSessions'); div.innerHTML = "";
-    (configData.sessions || []).forEach((s, i) => {
-        div.innerHTML += `<div class="admin-row"><input type="text" id="sn${i}" value="${s.name}" style="flex:3"><input type="number" id="sc${i}" value="${s.cap}" style="flex:1"><button onclick="removeRow(${i})">X</button></div>`;
-    });
+async function checkAuth() {
+    const email = "admin@yourdomain.com"; // 관리자 이메일 (콘솔에서 생성)
+    const password = prompt("관리자 비밀번호를 입력하세요.");
+
+    if (!password) return;
+
+    try {
+        // Firebase 인증 시도
+        await firebase.auth().signInWithEmailAndPassword(email, password);
+        
+        // 로그인 성공 시 관리자 섹션 표시
+        document.getElementById('userSection').style.display = 'none';
+        document.getElementById('adminSection').style.display = 'block';
+    } catch (error) {
+        alert("비밀번호가 틀렸거나 권한이 없습니다.");
+        console.error(error);
+    }
 }
+
+// 로그아웃 기능 (goHome 시 추가 권장)
+function goHome() {
+    firebase.auth().signOut(); // 로그아웃하여 보안 유지
+    document.getElementById('adminSection').style.display = 'none';
+    document.getElementById('userSection').style.display = 'block';
+}
+
 function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
 function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
 function saveAdminSettings() {
