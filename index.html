@@ -220,11 +220,28 @@ async function doReserve() {
     }
 
     btn.disabled = true;
-    const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
-    sessionRef.transaction((session) => {
-        if (session && session.cap > 0) { session.cap -= 1; return session; }
+const sessionSnapshot = await db.ref(`master/sessions/${selectedIdx}`).once('value');
+    const sessionData = sessionSnapshot.val();
+
+    if (!sessionData || sessionData.cap <= 0) {
+        alert("죄송합니다. 방금 예약이 마감되었습니다.");
+        btn.disabled = false;
         return;
+    }
+
+    // 트랜잭션 시작
+    db.ref(`master/sessions/${selectedIdx}`).transaction((session) => {
+        if (session) {
+            if (session.cap > 0) {
+                session.cap -= 1;
+                return session;
+            }
+        }
+        return; // 마감된 경우 트랜잭션 취소
     }, (error, committed, snapshot) => {
+        // ... 후속 처리 로직 ...
+    });
+}, (error, committed, snapshot) => {
         if (error || !committed) {
             alert("죄송합니다. 예약이 마감되었습니다.");
             btn.disabled = false;
