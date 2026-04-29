@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>렉스김어학원 예약 시스템</title>
-     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -129,9 +129,13 @@ const firebaseConfig = {
   measurementId: "G-DEBRHN2YWR"
 };
 
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+// 초기화 순서 보장
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.database();
-const auth = firebase.auth(); // 이 줄을 추가하면 관리가 더 편해집니다.
+const auth = firebase.auth(); // 이제 정상적으로 작동합니다.
+
 let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
 let reserveLogs = {};
 let selectedIdx = null;
@@ -306,21 +310,20 @@ function resetForm() {
     renderUserSessions();
 }
 async function checkAuth() {
-    const email = "lexkimhw@gmail.com"; // 관리자 이메일 (콘솔에서 생성)
+    const email = "lexkimhw@gmail.com"; 
     const password = prompt("관리자 비밀번호를 입력하세요.");
 
     if (!password) return;
 
     try {
-        // Firebase 인증 시도
-        await firebase.auth().signInWithEmailAndPassword(email, password);
+        // 변수 auth를 직접 사용
+        await auth.signInWithEmailAndPassword(email, password);
         
-        // 로그인 성공 시 관리자 섹션 표시
         document.getElementById('userSection').style.display = 'none';
         document.getElementById('adminSection').style.display = 'block';
     } catch (error) {
         alert("비밀번호가 틀렸거나 권한이 없습니다.");
-        console.error(error);
+        console.error("로그인 에러 상세:", error); // 에러 내용 확인용
     }
 }
 
