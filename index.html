@@ -191,6 +191,11 @@ db.ref('logs').on('value', (snap) => {
 
 // 스마트 예약 및 회차 변경 로직
 async function doReserve() {
+
+if (!configData || !configData.sessions || !configData.sessions[selectedIdx]) {
+        return alert("데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요.");
+    }
+
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
     const isBriefing = configData.title.includes("설명회");
