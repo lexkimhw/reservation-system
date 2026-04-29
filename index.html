@@ -324,6 +324,20 @@ async function checkAuth() {
     }
 }
 
+function renderAdminSessions() {
+    const div = document.getElementById('edSessions');
+    if(!div) return;
+    div.innerHTML = "";
+    (configData.sessions || []).forEach((s, i) => {
+        div.innerHTML += `
+            <div class="admin-row">
+                <input type="text" id="sn${i}" value="${s.name}" placeholder="회차명 (예: 1회차 14:00)">
+                <input type="number" id="sc${i}" value="${s.cap}" style="width:70px;" placeholder="정원">
+                <button onclick="removeRow(${i})">❌</button>
+            </div>`;
+    });
+}
+
 // 로그아웃 기능 (goHome 시 추가 권장)
 function goHome() {
     firebase.auth().signOut(); // 로그아웃하여 보안 유지
