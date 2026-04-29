@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>렉스김어학원 예약 시스템</title>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
-     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -55,8 +55,8 @@
         <div id="sessionList" class="session-list"></div>
         
         <div id="inputForm" style="display:none;">
-            <h3>2. 정보 입력</h3>
-            <input type="text" id="inName" placeholder="학생 이름" lang="ko" oninput="validateName(this)">
+            <h3 id="inputFormTitle">2. 정보 입력</h3>
+            <input type="text" id="inName" placeholder="학생 한글 이름" lang="ko" oninput="validateName(this)">
             <input type="text" id="inPhone" placeholder="학부모님 연락처 (010-0000-0000)" maxlength="13" oninput="autoHyphen(this)">
             
             <div id="briefingOnlyFields" style="display:none;">
@@ -67,7 +67,7 @@
                     <option value="두분 모두">두분 모두</option>
                 </select>
                 <div class="info-warning">
-                    ※ 부모님을 대신하여 할아버지, 할머니, 이모, 고모, 아는 지인 참석은 안됩니다.
+                    ※ 부모님을 대신하여 조부모님, 친인척, 지인 참석은 불가합니다.
                 </div>
             </div>
 
@@ -80,7 +80,7 @@
     <div id="adminSection">
         <div class="admin-nav">
             <button onclick="goHome()">🏠 메인으로</button>
-            <strong>관리자 설정</strong>
+            <strong>관리자 모드</strong>
         </div>
         <div class="admin-box">
             <strong>공지 및 예약 기간 설정</strong>
@@ -118,6 +118,7 @@
 </div>
 
 <script>
+// Firebase 설정
 const firebaseConfig = {
   apiKey: "AIzaSyBjuZuVPp-jAQVVlHo1ZWoydVt5dfngSao",
   authDomain: "lexkimhw-63c3b.firebaseapp.com",
@@ -129,52 +130,31 @@ const firebaseConfig = {
   measurementId: "G-DEBRHN2YWR"
 };
 
-// 초기화 순서 보장
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const auth = firebase.auth(); // 이제 정상적으로 작동합니다.
+const auth = firebase.auth();
 
 let configData = { title: "", desc: "", sessions: [], start: "", end: "", templates: {} };
 let reserveLogs = {};
 let selectedIdx = null;
 
-// [실시간 데이터 감시 및 UI 업데이트]
+// [데이터 감시]
 db.ref('master').on('value', (snap) => {
     const data = snap.val();
     if(data) {
         configData = data;
-        const title = data.title || "";
-        document.getElementById('viewTitle').innerText = title;
+        document.getElementById('viewTitle').innerText = data.title || "";
         document.getElementById('viewDesc').innerText = data.desc || "";
-        document.getElementById('edTitle').value = title;
-        document.getElementById('edDesc').value = data.desc || "";
-        document.getElementById('edStart').value = data.start || "";
-        document.getElementById('edEnd').value = data.end || "";
-
-        // --- 모드 체크 로직 ---
-        const isBriefing = title.includes("설명회");
-        const isExam = title.includes("시험"); // "시험" 포함 여부 체크
         
-        const briefingDiv = document.getElementById('briefingOnlyFields');
-        const nameInput = document.getElementById('inName');
-        const infoTitle = document.querySelector('#inputForm h3');
-
-        // 설명회 전용 UI
-        if(isBriefing) {
-            briefingDiv.style.display = "block";
-            nameInput.placeholder = "학생 한글 이름 (성과 이름 붙여쓰기)";
-        } else {
-            briefingDiv.style.display = "none";
-            nameInput.placeholder = "학생 한글 이름 (성과 이름 붙여쓰기)";
-        }
-
-        // 시험 전용 안내 문구 (요청사항 반영)
+        // 입력 폼 UI 조정
+        const isBriefing = data.title.includes("설명회");
+        const isExam = data.title.includes("시험");
+        document.getElementById('briefingOnlyFields').style.display = isBriefing ? "block" : "none";
+        
         if(isExam) {
-            infoTitle.innerHTML = '2. 정보 입력 <span style="font-size:0.8rem; color:#e74c3c; font-weight:normal; margin-left:5px;">(형제, 쌍둥이는 각각 따로 입력 바람)</span>';
+            document.getElementById('inputFormTitle').innerHTML = '2. 정보 입력 <span style="font-size:0.8rem; color:#e74c3c; font-weight:normal; margin-left:5px;">(형제, 쌍둥이는 각각 따로 입력 바람)</span>';
         } else {
-            infoTitle.innerText = '2. 정보 입력';
+            document.getElementById('inputFormTitle').innerText = '2. 정보 입력';
         }
 
         renderTemplateList(data.templates || {});
@@ -184,78 +164,225 @@ db.ref('master').on('value', (snap) => {
     }
 });
 
+// [로그 감시]
 db.ref('logs').on('value', (snap) => { 
     reserveLogs = snap.val() || {}; 
-    renderLogTable(); 
+    renderLogTable(); // 데이터 변경 시 즉시 테이블 갱신
 });
 
-// 스마트 예약 및 회차 변경 로직
+// [예약 실행] - 중복 방지 로직 강화
 async function doReserve() {
-
-if (!configData || !configData.sessions || !configData.sessions[selectedIdx]) {
-        return alert("데이터를 불러오는 중입니다. 잠시 후 다시 시도해주세요.");
-    }
-
+    const btn = document.getElementById('submitBtn');
     const name = document.getElementById('inName').value.trim();
     const phone = document.getElementById('inPhone').value.trim();
-    const isBriefing = configData.title.includes("설명회");
     const attendee = document.getElementById('inAttendee').value;
-    const btn = document.getElementById('submitBtn');
-    
-    if(!isPeriodActive()) return alert("기간이 아닙니다.");
+    const isBriefing = configData.title.includes("설명회");
+
+    if(!isPeriodActive()) return alert("현재 예약 기간이 아닙니다.");
     if(!name || !phone || selectedIdx === null) return alert("모든 정보를 입력해주세요.");
     if(isBriefing && !attendee) return alert("설명회 참석자를 선택해주세요.");
     if(!/^010-\d{3,4}-\d{4}$/.test(phone)) return alert("연락처 형식을 확인해주세요.");
 
-    const newSessionName = configData.sessions[selectedIdx].name;
+    btn.disabled = true; // 중복 클릭 방지
 
-    const existingLogKey = Object.keys(reserveLogs).find(k => 
-        reserveLogs[k].student === name && reserveLogs[k].phone === phone
-    );
+    try {
+        // 1. 실시간 중복 체크 (DB에서 최신 로그를 직접 가져옴)
+        const logSnap = await db.ref('logs').once('value');
+        const currentLogs = logSnap.val() || {};
+        const newSessionName = configData.sessions[selectedIdx].name;
 
-    if (existingLogKey) {
-        const oldLog = reserveLogs[existingLogKey];
-        if(oldLog.session === newSessionName) return alert(`이미 ${oldLog.session}에 예약되어 있습니다.`);
-        
-        if (confirm(`이미 [${oldLog.session}]에 예약되어 있습니다.\n[${newSessionName}](으)로 변경하시겠습니까?`)) {
-            btn.disabled = true;
-            if(oldLog.sessionIdx !== undefined) await db.ref(`master/sessions/${oldLog.sessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
+        const existingLogKey = Object.keys(currentLogs).find(k => 
+            currentLogs[k].student === name && currentLogs[k].phone === phone
+        );
+
+        if (existingLogKey) {
+            const oldLog = currentLogs[existingLogKey];
+            if(oldLog.session === newSessionName) {
+                alert(`이미 [${oldLog.session}]에 예약되어 있습니다.`);
+                btn.disabled = false;
+                return;
+            }
+            
+            if (!confirm(`이미 [${oldLog.session}]에 예약되어 있습니다.\n[${newSessionName}](으)로 변경하시겠습니까?`)) {
+                btn.disabled = false;
+                return;
+            }
+
+            // 기존 예약 좌석 복구 및 로그 삭제
+            if(oldLog.sessionIdx !== undefined) {
+                await db.ref(`master/sessions/${oldLog.sessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
+            }
             await db.ref(`logs/${existingLogKey}`).remove();
-        } else { return; }
-    }
-
-    btn.disabled = true;
-    const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
-    sessionRef.transaction((session) => {
-        if (session && session.cap > 0) { session.cap -= 1; return session; }
-        return;
-    }, (error, committed, snapshot) => {
-        if (error || !committed) {
-            alert("죄송합니다. 예약이 마감되었습니다.");
-            btn.disabled = false;
-        } else {
-            db.ref('logs').push({
-                date: new Date().toLocaleString('ko-KR'),
-                session: snapshot.val().name,
-                sessionIdx: selectedIdx,
-                student: name,
-                phone: phone,
-                attendee: isBriefing ? attendee : "-"
-            }).then(() => {
-                alert(`예약이 완료되었습니다.`);
-                resetForm();
-            });
         }
+
+        // 2. 트랜잭션으로 좌석 차감 및 예약 등록
+        const sessionRef = db.ref(`master/sessions/${selectedIdx}`);
+        sessionRef.transaction((session) => {
+            if (session && session.cap > 0) { session.cap -= 1; return session; }
+            return; 
+        }, (error, committed, snapshot) => {
+            if (!committed) {
+                alert("죄송합니다. 그 사이에 예약이 마감되었습니다.");
+                btn.disabled = false;
+            } else {
+                db.ref('logs').push({
+                    date: new Date().toLocaleString('ko-KR'),
+                    session: snapshot.val().name,
+                    sessionIdx: selectedIdx,
+                    student: name,
+                    phone: phone,
+                    attendee: isBriefing ? attendee : "-"
+                }).then(() => {
+                    alert("예약이 정상적으로 완료되었습니다.");
+                    resetForm();
+                });
+            }
+        });
+
+    } catch (e) {
+        console.error(e);
+        alert("오류가 발생했습니다. 다시 시도해주세요.");
+        btn.disabled = false;
+    }
+}
+
+// [유틸리티 함수들]
+function updatePeriodStatus() {
+    const el = document.getElementById('periodDisplay');
+    const active = isPeriodActive();
+    if(!active) {
+        el.innerText = "현재 예약 기간이 아닙니다."; el.className = "period-info";
+        document.getElementById('inputForm').style.display = 'none';
+    } else {
+        const endStr = configData.end ? configData.end.replace('T', ' ') : '';
+        el.innerText = `현재 예약 가능 기간 (~ ${endStr})`;
+        el.className = "period-info period-active";
+    }
+}
+
+function isPeriodActive() {
+    if(!configData.start || !configData.end) return true;
+    const now = new Date(); 
+    return now >= new Date(configData.start) && now <= new Date(configData.end);
+}
+
+function renderUserSessions() {
+    const div = document.getElementById('sessionList'); div.innerHTML = "";
+    (configData.sessions || []).forEach((s, i) => {
+        const isSoldOut = s.cap <= 0;
+        const item = document.createElement('div');
+        item.className = `session-item ${(!isPeriodActive() || isSoldOut) ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
+        item.onclick = () => { 
+            if(isPeriodActive() && !isSoldOut) { 
+                selectedIdx = i; 
+                renderUserSessions(); 
+                document.getElementById('inputForm').style.display = 'block'; 
+            } 
+        };
+        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${isSoldOut ? '마감' : '잔여 '+s.cap+'석'}</span><strong>${s.name}</strong>`;
+        div.appendChild(item);
     });
 }
 
+function renderLogTable() {
+    const body = document.getElementById('resTable'); 
+    if(!body) return;
+    body.innerHTML = "";
+    // 최신 예약이 위로 오도록 정렬하여 출력
+    const keys = Object.keys(reserveLogs).reverse();
+    keys.forEach(k => { 
+        const r = reserveLogs[k]; 
+        const row = body.insertRow();
+        row.innerHTML = `<td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td>${r.attendee || '-'}</td><td><button onclick="delLog('${k}')">삭제</button></td>`;
+    });
+}
+
+function resetForm() {
+    document.getElementById('inName').value = ""; 
+    document.getElementById('inPhone').value = "";
+    document.getElementById('inAttendee').value = ""; 
+    document.getElementById('submitBtn').disabled = false;
+    selectedIdx = null; 
+    document.getElementById('inputForm').style.display = 'none';
+    renderUserSessions();
+}
+
+async function checkAuth() {
+    const password = prompt("관리자 비밀번호를 입력하세요.");
+    if (!password) return;
+    try {
+        await auth.signInWithEmailAndPassword("lexkimhw@gmail.com", password);
+        document.getElementById('userSection').style.display = 'none';
+        document.getElementById('adminSection').style.display = 'block';
+        
+        // 관리자 진입 시 데이터 강제 세팅
+        document.getElementById('edTitle').value = configData.title;
+        document.getElementById('edDesc').value = configData.desc;
+        document.getElementById('edStart').value = configData.start;
+        document.getElementById('edEnd').value = configData.end;
+        renderLogTable();
+    } catch (e) { alert("인증에 실패했습니다."); }
+}
+
+function goHome() {
+    auth.signOut();
+    document.getElementById('adminSection').style.display = 'none';
+    document.getElementById('userSection').style.display = 'block';
+}
+
+// [기타 관리 기능]
+function validateName(obj) { obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, ''); }
+function autoHyphen(obj) {
+    let str = obj.value.replace(/[^0-9]/g, '');
+    if (str.length < 4) obj.value = str;
+    else if (str.length < 11) obj.value = str.substr(0, 3) + '-' + str.substr(3, 3) + '-' + str.substr(6);
+    else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
+}
+function renderAdminSessions() {
+    const div = document.getElementById('edSessions'); if(!div) return;
+    div.innerHTML = "";
+    (configData.sessions || []).forEach((s, i) => {
+        div.innerHTML += `<div class="admin-row">
+            <input type="text" id="sn${i}" value="${s.name}" placeholder="회차명">
+            <input type="number" id="sc${i}" value="${s.cap}" style="width:70px;">
+            <button onclick="removeRow(${i})">❌</button>
+        </div>`;
+    });
+}
+function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
+function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
+function saveAdminSettings() {
+    const sessionRows = (configData.sessions || []).map((_, i) => ({ 
+        name: document.getElementById(`sn${i}`).value, 
+        cap: parseInt(document.getElementById(`sc${i}`).value) || 0 
+    }));
+    db.ref('master').update({ 
+        title: document.getElementById('edTitle').value, 
+        desc: document.getElementById('edDesc').value, 
+        start: document.getElementById('edStart').value, 
+        end: document.getElementById('edEnd').value, 
+        sessions: sessionRows 
+    }).then(() => alert("설정이 저장되었습니다."));
+}
+async function delLog(k) {
+    if(!confirm("해당 예약을 삭제하시겠습니까?")) return;
+    const log = reserveLogs[k];
+    if(log.sessionIdx !== undefined) {
+        await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
+    }
+    db.ref(`logs/${k}`).remove();
+}
+function clearAllLogs() { if(confirm("모든 예약 명단을 삭제하시겠습니까?")) db.ref('logs').remove(); }
+function downloadExcel() {
+    const data = Object.values(reserveLogs).map(r => ({"신청시간": r.date, "회차": r.session, "학생명": r.student, "연락처": r.phone, "참석자": r.attendee}));
+    const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "예약명단"); XLSX.writeFile(wb, `렉스김_예약명단.xlsx`);
+}
 function renderTemplateList(templates) {
-    const select = document.getElementById('templateSelect');
-    if(!select) return;
+    const select = document.getElementById('templateSelect'); if(!select) return;
     select.innerHTML = '<option value="">-- 저장된 템플릿 선택 --</option>';
     Object.keys(templates).forEach(key => {
-        const opt = document.createElement('option');
-        opt.value = key; opt.innerText = templates[key].title;
+        const opt = document.createElement('option'); opt.value = key; opt.innerText = templates[key].title;
         select.appendChild(opt);
     });
 }
@@ -274,109 +401,6 @@ function deleteTemplate() {
     const key = document.getElementById('templateSelect').value;
     if(!key) return alert("삭제할 템플릿을 선택하세요.");
     if(confirm("정말 삭제하시겠습니까?")) db.ref(`master/templates/${key}`).remove();
-}
-
-function validateName(obj) { obj.value = obj.value.replace(/[^ㄱ-ㅎ|ㅏ-ㅣ|가-힣|a-z|A-Z|\s]/g, ''); }
-function autoHyphen(obj) {
-    let str = obj.value.replace(/[^0-9]/g, '');
-    if (str.length < 4) obj.value = str;
-    else if (str.length < 11) obj.value = str.substr(0, 3) + '-' + str.substr(3, 3) + '-' + str.substr(6);
-    else obj.value = str.substr(0, 3) + '-' + str.substr(3, 4) + '-' + str.substr(7);
-}
-function isPeriodActive() {
-    if(!configData.start || !configData.end) return true;
-    const now = new Date(); return now >= new Date(configData.start) && now <= new Date(configData.end);
-}
-function updatePeriodStatus() {
-    const el = document.getElementById('periodDisplay');
-    if(!isPeriodActive()) {
-        el.innerText = "현재 예약 기간이 아닙니다."; el.className = "period-info";
-        document.getElementById('inputForm').style.display = 'none';
-    } else {
-        el.innerText = `현재 예약 가능 기간 (~ ${configData.end ? configData.end.replace('T', ' ') : ''})`;
-        el.className = "period-info period-active";
-    }
-}
-function renderUserSessions() {
-    const div = document.getElementById('sessionList'); div.innerHTML = "";
-    (configData.sessions || []).forEach((s, i) => {
-        const isSoldOut = s.cap <= 0;
-        const item = document.createElement('div');
-        item.className = `session-item ${(!isPeriodActive() || isSoldOut) ? 'disabled' : ''} ${selectedIdx === i ? 'selected' : ''}`;
-        item.onclick = () => { if(isPeriodActive() && !isSoldOut) { selectedIdx = i; renderUserSessions(); document.getElementById('inputForm').style.display = 'block'; } };
-        item.innerHTML = `<span class="rem-tag" style="color:${isSoldOut ? '#888':'#e74c3c'}">${isSoldOut ? '마감' : '잔여 '+s.cap+'석'}</span><strong>${s.name}</strong>`;
-        div.appendChild(item);
-    });
-}
-function resetForm() {
-    document.getElementById('inName').value = ""; document.getElementById('inPhone').value = "";
-    document.getElementById('inAttendee').value = ""; document.getElementById('submitBtn').disabled = false;
-    selectedIdx = null; document.getElementById('inputForm').style.display = 'none';
-    renderUserSessions();
-}
-async function checkAuth() {
-    const email = "lexkimhw@gmail.com"; 
-    const password = prompt("관리자 비밀번호를 입력하세요.");
-
-    if (!password) return;
-
-    try {
-        // 변수 auth를 직접 사용
-        await auth.signInWithEmailAndPassword(email, password);
-        
-        document.getElementById('userSection').style.display = 'none';
-        document.getElementById('adminSection').style.display = 'block';
-    } catch (error) {
-        alert("비밀번호가 틀렸거나 권한이 없습니다.");
-        console.error("로그인 에러 상세:", error); // 에러 내용 확인용
-    }
-}
-
-function renderAdminSessions() {
-    const div = document.getElementById('edSessions');
-    if(!div) return;
-    div.innerHTML = "";
-    (configData.sessions || []).forEach((s, i) => {
-        div.innerHTML += `
-            <div class="admin-row">
-                <input type="text" id="sn${i}" value="${s.name}" placeholder="회차명 (예: 1회차 14:00)">
-                <input type="number" id="sc${i}" value="${s.cap}" style="width:70px;" placeholder="정원">
-                <button onclick="removeRow(${i})">❌</button>
-            </div>`;
-    });
-}
-
-// 로그아웃 기능 (goHome 시 추가 권장)
-function goHome() {
-    firebase.auth().signOut(); // 로그아웃하여 보안 유지
-    document.getElementById('adminSection').style.display = 'none';
-    document.getElementById('userSection').style.display = 'block';
-}
-
-function addSessionRow() { if(!configData.sessions) configData.sessions = []; configData.sessions.push({name: "", cap: 20}); renderAdminSessions(); }
-function removeRow(i) { configData.sessions.splice(i,1); renderAdminSessions(); }
-function saveAdminSettings() {
-    const sessionRows = (configData.sessions || []).map((_, i) => ({ name: document.getElementById(`sn${i}`).value, cap: parseInt(document.getElementById(`sc${i}`).value) || 0 }));
-    db.ref('master').update({ title: document.getElementById('edTitle').value, desc: document.getElementById('edDesc').value, start: document.getElementById('edStart').value, end: document.getElementById('edEnd').value, sessions: sessionRows }).then(() => alert("저장 완료"));
-}
-function renderLogTable() {
-    const body = document.getElementById('resTable'); body.innerHTML = "";
-    Object.keys(reserveLogs).reverse().forEach(k => { 
-        const r = reserveLogs[k]; 
-        body.innerHTML += `<tr><td>${r.session}</td><td>${r.student}</td><td>${r.phone}</td><td>${r.attendee || '-'}</td><td><button onclick="delLog('${k}')">삭제</button></td></tr>`; 
-    });
-}
-async function delLog(k) {
-    if(!confirm("삭제하시겠습니까?")) return;
-    const log = reserveLogs[k];
-    if(log.sessionIdx !== undefined) await db.ref(`master/sessions/${log.sessionIdx}/cap`).transaction(cap => (cap || 0) + 1);
-    db.ref(`logs/${k}`).remove();
-}
-function clearAllLogs() { if(confirm("전체 삭제하시겠습니까?")) db.ref('logs').remove(); }
-function downloadExcel() {
-    const data = Object.values(reserveLogs).map(r => ({"시간": r.date, "회차": r.session, "학생": r.student, "연락처": r.phone, "참석자": r.attendee}));
-    const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "예약명단"); XLSX.writeFile(wb, `예약명단.xlsx`);
 }
 </script>
 </body>
